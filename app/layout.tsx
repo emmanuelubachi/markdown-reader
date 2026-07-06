@@ -20,6 +20,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Markdown Reader",
   description: "Drop a markdown file and read a local preview.",
+  icons: {
+    icon: [
+      { url: "/assets/icon-dark.svg", media: "(prefers-color-scheme: light)" },
+      { url: "/assets/icon.svg", media: "(prefers-color-scheme: dark)" },
+    ],
+  },
 };
 
 export default function RootLayout({
