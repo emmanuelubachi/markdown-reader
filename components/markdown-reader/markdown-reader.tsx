@@ -49,7 +49,10 @@ import {
   isMarkdownFile,
 } from "@/lib/markdown/document";
 import { parseMarkdown } from "@/lib/markdown/parse";
-import { getReadableChunks } from "@/lib/markdown/speech";
+import {
+  getReadableChunks,
+  rememberReadableSelection,
+} from "@/lib/markdown/speech";
 import { getDocumentStats } from "@/lib/markdown/stats";
 import type {
   DocumentStats,
@@ -930,6 +933,13 @@ function SourceView({
         className="h-full min-h-full w-full resize-none overflow-auto bg-transparent p-5 font-mono text-xs leading-relaxed text-foreground caret-[#03444A] outline-none selection:bg-[#58D1E2]/30 placeholder:text-muted-foreground dark:caret-[#58D1E2] sm:p-8"
         data-readable-root="source"
         onChange={(event) => onChange(event.currentTarget.value)}
+        onSelect={(event) => {
+          const textarea = event.currentTarget;
+
+          rememberReadableSelection(
+            textarea.value.slice(textarea.selectionStart, textarea.selectionEnd),
+          );
+        }}
         spellCheck={false}
         value={content}
       />
