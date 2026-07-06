@@ -11,6 +11,7 @@ import {
   AlertCircle,
   BookOpen,
   Braces,
+  ChevronDown,
   ClipboardPaste,
   Columns2,
   FileText,
@@ -29,10 +30,6 @@ import { EmptyPreview } from "@/components/markdown-reader/upload-drop-zone";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -767,34 +764,42 @@ function SplitReaderPane({
       }
       value={tab.view}
     >
-      <div className="flex min-h-14 shrink-0 items-center gap-2 border-b border-border/70 px-3 py-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
-            {label}
-          </p>
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 bg-muted/30 px-2.5 sm:px-3">
+        {/* File chip: static name for the active pane, switchable for the split pane */}
+        <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3 shadow-xs ring-1 ring-foreground/5">
+          <FileText
+            className="size-4 shrink-0 text-[#03444A] dark:text-[#58D1E2]"
+            aria-hidden="true"
+          />
           {selectableTabs && onSelectTab ? (
-            <NativeSelect
-              aria-label="Choose split tab"
-              className="mt-1 w-full max-w-xs"
-              onChange={(event) => onSelectTab(event.currentTarget.value)}
-              size="sm"
-              value={tab.id}
-            >
-              {selectableTabs
-                .filter((candidateTab) => candidateTab.id !== activeTabId)
-                .map((candidateTab, index) => (
-                  <NativeSelectOption
-                    key={candidateTab.id}
-                    value={candidateTab.id}
-                  >
-                    {getReaderTabLabel(candidateTab, index)}
-                  </NativeSelectOption>
-                ))}
-            </NativeSelect>
+            <div className="relative flex min-w-0 flex-1 items-center">
+              <select
+                aria-label="Choose split tab"
+                className="w-full min-w-0 cursor-pointer appearance-none truncate bg-transparent pr-5 text-sm font-medium outline-none"
+                onChange={(event) => onSelectTab(event.currentTarget.value)}
+                value={tab.id}
+              >
+                {selectableTabs
+                  .filter((candidateTab) => candidateTab.id !== activeTabId)
+                  .map((candidateTab, index) => (
+                    <option
+                      className="bg-[Canvas] font-sans text-[CanvasText]"
+                      key={candidateTab.id}
+                      value={candidateTab.id}
+                    >
+                      {getReaderTabLabel(candidateTab, index)}
+                    </option>
+                  ))}
+              </select>
+              <ChevronDown
+                className="pointer-events-none absolute right-0 size-3.5 text-muted-foreground"
+                aria-hidden="true"
+              />
+            </div>
           ) : (
-            <p className="truncate text-sm font-medium">
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
               {file?.name ?? getReaderTabLabel(tab, 0)}
-            </p>
+            </span>
           )}
         </div>
 
@@ -802,11 +807,11 @@ function SplitReaderPane({
           <TabsList aria-label={`${label} view`} className="shrink-0">
             <TabsTrigger value="preview">
               <BookOpen aria-hidden="true" />
-              Preview
+              <span className="hidden xl:inline">Preview</span>
             </TabsTrigger>
             <TabsTrigger value="source">
               <Braces aria-hidden="true" />
-              Source
+              <span className="hidden xl:inline">Source</span>
             </TabsTrigger>
           </TabsList>
         ) : null}
@@ -814,6 +819,7 @@ function SplitReaderPane({
         {onCloseSplit ? (
           <Button
             aria-label="Close split view"
+            className="shrink-0"
             onClick={onCloseSplit}
             size="icon"
             type="button"
@@ -821,7 +827,9 @@ function SplitReaderPane({
           >
             <PanelRightClose aria-hidden="true" />
           </Button>
-        ) : null}
+        ) : (
+          <div className="size-9 shrink-0" aria-hidden="true" />
+        )}
       </div>
 
       {tab.error ? (
