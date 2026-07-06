@@ -80,7 +80,7 @@
   --chart-3: var(--core-mid-gray);
   --chart-4: var(--core-charcoal);
   --chart-5: color-mix(in srgb, var(--core-teal) 52%, var(--core-deep-teal));
-  --radius: 0.625rem;
+  --radius: 1rem;
   --sidebar: #ffffff;
   --sidebar-foreground: var(--core-charcoal);
   --sidebar-primary: var(--core-deep-teal);
@@ -106,17 +106,9 @@
     var(--core-charcoal)
   );
   --secondary-foreground: color-mix(in srgb, var(--core-mid-gray) 18%, white);
-  --muted: color-mix(
-    in srgb,
-    var(--core-mid-gray) 16%,
-    var(--core-charcoal)
-  );
+  --muted: color-mix(in srgb, var(--core-mid-gray) 16%, var(--core-charcoal));
   --muted-foreground: var(--core-mid-gray);
-  --accent: color-mix(
-    in srgb,
-    var(--core-mid-gray) 12%,
-    var(--core-charcoal)
-  );
+  --accent: color-mix(in srgb, var(--core-mid-gray) 12%, var(--core-charcoal));
   --accent-foreground: var(--core-teal);
   --destructive: oklch(0.704 0.191 22.216);
   --border: color-mix(in srgb, var(--core-mid-gray) 22%, transparent);
@@ -207,7 +199,7 @@
 
   .markdown-preview h1 {
     border-bottom: 1px solid var(--border);
-    font-size: clamp(2rem, 4vw, 3rem);
+    font-size: 2.5rem;
     padding-bottom: 0.8rem;
   }
 
@@ -215,6 +207,16 @@
     border-bottom: 1px solid var(--border);
     font-size: 1.75rem;
     padding-bottom: 0.55rem;
+  }
+
+  @media (max-width: 640px) {
+    .markdown-preview h1 {
+      font-size: 2rem;
+    }
+
+    .markdown-preview h2 {
+      font-size: 1.45rem;
+    }
   }
 
   .markdown-preview h3 {
