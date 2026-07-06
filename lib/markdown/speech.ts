@@ -1,5 +1,10 @@
 import type { MarkdownBlock } from "@/lib/markdown/types";
 
+const REMEMBERED_SELECTION_MAX_AGE_MS = 10_000;
+
+let rememberedReadableSelection: { text: string; timestamp: number } | null =
+  null;
+
 export function getReadableChunks(blocks: MarkdownBlock[]) {
   return blocks.flatMap((block) => {
     switch (block.type) {
@@ -100,16 +105,24 @@ export function getSelectedChunkIndex(chunks: string[]) {
   }
 
   const selection = window.getSelection();
+  const selectedSourceText = getRememberedReadableSelection();
 
   if (
-    !selection ||
-    selection.isCollapsed ||
-    !selectionWithinReadableRoot(selection)
+    (!selection ||
+      selection.isCollapsed ||
+      !selectionWithinReadableRoot(selection)) &&
+    !selectedSourceText
   ) {
     return null;
   }
 
-  const selectedText = normalizeSpeechMatch(selection.toString());
+  const selectedText = normalizeSpeechMatch(
+    selection &&
+      !selection.isCollapsed &&
+      selectionWithinReadableRoot(selection)
+      ? selection.toString()
+      : selectedSourceText,
+  );
 
   if (!selectedText) {
     return null;
@@ -149,6 +162,14 @@ export function getSelectedChunkIndex(chunks: string[]) {
   return bestMatch && bestMatch.score >= 2 ? bestMatch.index : null;
 }
 
+export function rememberReadableSelection(text: string) {
+  const trimmedText = text.trim();
+
+  rememberedReadableSelection = trimmedText
+    ? { text: trimmedText, timestamp: Date.now() }
+    : null;
+}
+
 function selectionWithinReadableRoot(selection: Selection) {
   return (
     nodeWithinReadableRoot(selection.anchorNode) ||
@@ -175,6 +196,20 @@ function normalizeSpeechMatch(text: string) {
     .replace(/[^a-z0-9'\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function getRememberedReadableSelection() {
+  if (
+    !rememberedReadableSelection ||
+    Date.now() - rememberedReadableSelection.timestamp >
+      REMEMBERED_SELECTION_MAX_AGE_MS
+  ) {
+    rememberedReadableSelection = null;
+
+    return "";
+  }
+
+  return rememberedReadableSelection.text;
 }
 
 function getWordOverlapScore(selectedWords: string[], chunkText: string) {

@@ -1,26 +1,95 @@
 "use client";
 
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  Children,
+  isValidElement,
+  useEffect,
+  useRef,
+  type ComponentPropsWithoutRef,
+  type JSX,
+  type ReactNode,
+} from "react";
+import ReactMarkdown, {
+  defaultUrlTransform,
+  type Components,
+  type UrlTransform,
+} from "react-markdown";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, {
+  defaultSchema,
+  type Options as RehypeSanitizeOptions,
+} from "rehype-sanitize";
+import remarkGfm from "remark-gfm";
 
+import {
+  createMarkdownSlugger,
+  getMarkdownNodeText,
+  type MarkdownAstNode,
+} from "@/lib/markdown/ast";
 import { sanitizeHref, sanitizeImageSrc } from "@/lib/markdown/sanitize";
-import type { MarkdownBlock } from "@/lib/markdown/types";
+
+type MarkdownElementProps<Tag extends keyof JSX.IntrinsicElements> =
+  ComponentPropsWithoutRef<Tag> & {
+    node?: unknown;
+  };
+
+const markdownSanitizeSchema: RehypeSanitizeOptions = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    img: [
+      ...(defaultSchema.attributes?.img ?? []),
+      "alt",
+      "title",
+      "width",
+      "height",
+      "loading",
+    ],
+    input: [...(defaultSchema.attributes?.input ?? []), ["checked", true]],
+  },
+  protocols: {
+    ...defaultSchema.protocols,
+    src: [...new Set([...(defaultSchema.protocols?.src ?? []), "data"])],
+  },
+};
+
+const markdownComponents: Components = {
+  a: MarkdownLink,
+  h1: MarkdownH1,
+  h2: MarkdownH2,
+  h3: MarkdownH3,
+  h4: MarkdownH4,
+  h5: MarkdownH5,
+  h6: MarkdownH6,
+  img: MarkdownImage,
+  li: MarkdownListItem,
+  p: MarkdownParagraph,
+  pre: MarkdownPre,
+  table: MarkdownTable,
+};
+
+const markdownUrlTransform: UrlTransform = (value, key, _node) => {
+  void _node;
+
+  if (key === "href") {
+    return sanitizeHref(value);
+  }
+
+  if (key === "src") {
+    return sanitizeImageSrc(value);
+  }
+
+  return defaultUrlTransform(value);
+};
 
 export function MarkdownPreview({
-  blocks,
+  content,
   onActiveHeadingChange,
 }: {
-  blocks: MarkdownBlock[];
+  content: string;
   onActiveHeadingChange: (headingId: string) => void;
 }) {
   const articleRef = useRef<HTMLElement>(null);
-  const headingSignature = useMemo(
-    () =>
-      blocks
-        .filter((block) => block.type === "heading")
-        .map((heading) => heading.id)
-        .join("\n"),
-    [blocks],
-  );
 
   useEffect(() => {
     const article = articleRef.current;
@@ -60,9 +129,9 @@ export function MarkdownPreview({
     headingElements.forEach((heading) => observer.observe(heading));
 
     return () => observer.disconnect();
-  }, [headingSignature, onActiveHeadingChange]);
+  }, [content, onActiveHeadingChange]);
 
-  if (blocks.length === 0) {
+  if (!content.trim()) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
         This markdown file is empty.
@@ -76,212 +145,308 @@ export function MarkdownPreview({
       data-readable-root="preview"
       ref={articleRef}
     >
-      {blocks.map((block, index) => renderBlock(block, index))}
+      <ReactMarkdown
+        components={markdownComponents}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema]]}
+        remarkPlugins={[remarkGfm, remarkHeadingIds]}
+        urlTransform={markdownUrlTransform}
+      >
+        {content}
+      </ReactMarkdown>
     </article>
   );
 }
 
-function renderBlock(block: MarkdownBlock, index: number) {
-  switch (block.type) {
-    case "heading": {
-      const children = renderInline(block.text, `${index}-heading`);
-      const key = `${block.id}-${index}`;
+function MarkdownLink({
+  node: _node,
+  href,
+  children,
+  ...props
+}: MarkdownElementProps<"a">) {
+  void _node;
 
-      if (block.level === 1) {
-        return (
-          <h1 data-markdown-heading id={block.id} key={key}>
-            {children}
-          </h1>
-        );
-      }
+  const safeHref = href ? sanitizeHref(href) : null;
 
-      if (block.level === 2) {
-        return (
-          <h2 data-markdown-heading id={block.id} key={key}>
-            {children}
-          </h2>
-        );
-      }
-
-      if (block.level === 3) {
-        return (
-          <h3 data-markdown-heading id={block.id} key={key}>
-            {children}
-          </h3>
-        );
-      }
-
-      if (block.level === 4) {
-        return (
-          <h4 data-markdown-heading id={block.id} key={key}>
-            {children}
-          </h4>
-        );
-      }
-
-      if (block.level === 5) {
-        return (
-          <h5 data-markdown-heading id={block.id} key={key}>
-            {children}
-          </h5>
-        );
-      }
-
-      return (
-        <h6 data-markdown-heading id={block.id} key={key}>
-          {children}
-        </h6>
-      );
-    }
-    case "paragraph":
-      return (
-        <p key={`paragraph-${index}`}>{renderInline(block.text, `${index}`)}</p>
-      );
-    case "blockquote":
-      return (
-        <blockquote key={`quote-${index}`}>
-          <p>{renderInline(block.text, `${index}-quote`)}</p>
-        </blockquote>
-      );
-    case "code":
-      return (
-        <figure key={`code-${index}`}>
-          {block.language ? <figcaption>{block.language}</figcaption> : null}
-          <pre>
-            <code>{block.code}</code>
-          </pre>
-        </figure>
-      );
-    case "hr":
-      return <hr key={`rule-${index}`} />;
-    case "list": {
-      const ListTag = block.ordered ? "ol" : "ul";
-
-      return (
-        <ListTag key={`list-${index}`}>
-          {block.items.map((item, itemIndex) => (
-            <li key={`${index}-${itemIndex}`}>
-              {renderInline(item, `${index}-item-${itemIndex}`)}
-            </li>
-          ))}
-        </ListTag>
-      );
-    }
-    case "table":
-      return (
-        <div className="table-wrap" key={`table-${index}`}>
-          <table>
-            <thead>
-              <tr>
-                {block.headers.map((header, headerIndex) => (
-                  <th key={`${index}-head-${headerIndex}`}>
-                    {renderInline(header, `${index}-head-${headerIndex}`)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {block.rows.map((row, rowIndex) => (
-                <tr key={`${index}-row-${rowIndex}`}>
-                  {block.headers.map((_, cellIndex) => (
-                    <td key={`${index}-cell-${rowIndex}-${cellIndex}`}>
-                      {renderInline(
-                        row[cellIndex] ?? "",
-                        `${index}-cell-${rowIndex}-${cellIndex}`,
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
+  if (!safeHref) {
+    return <span>{children}</span>;
   }
+
+  const opensNewWindow = /^(https?:)?\/\//.test(safeHref);
+
+  return (
+    <a
+      {...props}
+      href={safeHref}
+      rel={opensNewWindow ? "noreferrer" : props.rel}
+      target={opensNewWindow ? "_blank" : props.target}
+    >
+      {children}
+    </a>
+  );
 }
 
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  const pattern =
-    /(!?\[[^\]]+\]\([^)\s]+(?:\s+"[^"]*")?\)|`[^`]+`|\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_)/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
+function MarkdownH1({
+  node: _node,
+  children,
+  ...props
+}: MarkdownElementProps<"h1">) {
+  void _node;
 
-  while ((match = pattern.exec(text)) !== null) {
-    const token = match[0];
-
-    if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
-    }
-
-    nodes.push(renderInlineToken(token, `${keyPrefix}-${match.index}`));
-    lastIndex = match.index + token.length;
-  }
-
-  if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
-  }
-
-  return nodes;
+  return (
+    <h1 {...props} data-markdown-heading={shouldTrackHeading(props)}>
+      {children}
+    </h1>
+  );
 }
 
-function renderInlineToken(token: string, key: string): ReactNode {
-  const image = token.match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)$/);
+function MarkdownH2({
+  node: _node,
+  children,
+  ...props
+}: MarkdownElementProps<"h2">) {
+  void _node;
 
-  if (image) {
-    const alt = image[1];
-    const src = sanitizeImageSrc(image[2]);
+  return (
+    <h2 {...props} data-markdown-heading={shouldTrackHeading(props)}>
+      {children}
+    </h2>
+  );
+}
 
-    if (!src) {
-      return (
-        <span className="image-fallback" key={key}>
-          {alt || image[2]}
-        </span>
-      );
+function MarkdownH3({
+  node: _node,
+  children,
+  ...props
+}: MarkdownElementProps<"h3">) {
+  void _node;
+
+  return (
+    <h3 {...props} data-markdown-heading={shouldTrackHeading(props)}>
+      {children}
+    </h3>
+  );
+}
+
+function MarkdownH4({
+  node: _node,
+  children,
+  ...props
+}: MarkdownElementProps<"h4">) {
+  void _node;
+
+  return (
+    <h4 {...props} data-markdown-heading={shouldTrackHeading(props)}>
+      {children}
+    </h4>
+  );
+}
+
+function MarkdownH5({
+  node: _node,
+  children,
+  ...props
+}: MarkdownElementProps<"h5">) {
+  void _node;
+
+  return (
+    <h5 {...props} data-markdown-heading={shouldTrackHeading(props)}>
+      {children}
+    </h5>
+  );
+}
+
+function MarkdownH6({
+  node: _node,
+  children,
+  ...props
+}: MarkdownElementProps<"h6">) {
+  void _node;
+
+  return (
+    <h6 {...props} data-markdown-heading={shouldTrackHeading(props)}>
+      {children}
+    </h6>
+  );
+}
+
+function MarkdownImage({
+  node: _node,
+  src,
+  alt,
+  ...props
+}: MarkdownElementProps<"img">) {
+  void _node;
+
+  const safeSrc = typeof src === "string" ? sanitizeImageSrc(src) : null;
+
+  if (!safeSrc) {
+    return <span className="image-fallback">{alt || "Image blocked"}</span>;
+  }
+
+  // Markdown image dimensions are user-authored, so Next Image cannot know them here.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img {...props} alt={alt ?? ""} loading="lazy" src={safeSrc} />;
+}
+
+function MarkdownParagraph({
+  node: _node,
+  children,
+  className,
+  ...props
+}: MarkdownElementProps<"p">) {
+  void _node;
+
+  const nextClassName = [
+    className,
+    containsImageChild(children) ? "badge-row" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <p {...props} className={nextClassName || undefined}>
+      {children}
+    </p>
+  );
+}
+
+function MarkdownListItem({
+  node: _node,
+  children,
+  className,
+  ...props
+}: MarkdownElementProps<"li">) {
+  void _node;
+
+  const nextClassName = [
+    className,
+    containsElementChild(children, "input") ? "task-list-item" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <li {...props} className={nextClassName || undefined}>
+      {children}
+    </li>
+  );
+}
+
+function MarkdownPre({
+  node: _node,
+  children,
+  ...props
+}: MarkdownElementProps<"pre">) {
+  void _node;
+
+  const language = getCodeBlockLanguage(children);
+
+  return (
+    <figure>
+      {language ? <figcaption>{language}</figcaption> : null}
+      <pre {...props}>{children}</pre>
+    </figure>
+  );
+}
+
+function MarkdownTable({
+  node: _node,
+  children,
+  ...props
+}: MarkdownElementProps<"table">) {
+  void _node;
+
+  return (
+    <div className="table-wrap">
+      <table {...props}>{children}</table>
+    </div>
+  );
+}
+
+function getCodeBlockLanguage(children: ReactNode) {
+  const codeElement = Children.toArray(children).find((child) =>
+    isValidElement<MarkdownElementProps<"code">>(child),
+  );
+
+  if (!isValidElement<MarkdownElementProps<"code">>(codeElement)) {
+    return null;
+  }
+
+  const match = codeElement.props.className?.match(/language-(\S+)/);
+
+  return match?.[1] ?? null;
+}
+
+function containsImageChild(children: ReactNode): boolean {
+  return containsElementChild(children, "img", MarkdownImage);
+}
+
+function containsElementChild(
+  children: ReactNode,
+  ...elementTypes: Array<"img" | "input" | typeof MarkdownImage>
+): boolean {
+  return Children.toArray(children).some((child) => {
+    if (!isValidElement<{ children?: ReactNode }>(child)) {
+      return false;
     }
 
-    // Markdown image dimensions are user-authored, so Next Image cannot know them here.
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img alt={alt} key={key} src={src} />;
-  }
-
-  const link = token.match(/^\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)$/);
-
-  if (link) {
-    const href = sanitizeHref(link[2]);
-
-    if (!href) {
-      return <span key={key}>{renderInline(link[1], `${key}-label`)}</span>;
+    if (elementTypes.includes(child.type as (typeof elementTypes)[number])) {
+      return true;
     }
 
-    return (
-      <a href={href} key={key} rel="noreferrer" target="_blank">
-        {renderInline(link[1], `${key}-label`)}
-      </a>
-    );
+    return containsElementChild(child.props.children, ...elementTypes);
+  });
+}
+
+function remarkHeadingIds() {
+  return (tree: MarkdownAstNode) => {
+    const slugHeading = createMarkdownSlugger();
+
+    visitMarkdownAst(tree, (node) => {
+      if (node.type !== "heading") {
+        return;
+      }
+
+      const text = getMarkdownNodeText(node);
+
+      if (!text) {
+        return;
+      }
+
+      node.data = {
+        ...node.data,
+        hProperties: {
+          ...node.data?.hProperties,
+          dataMarkdownHeading: true,
+          id: slugHeading(text),
+        },
+      };
+    });
+  };
+}
+
+function visitMarkdownAst(
+  node: MarkdownAstNode,
+  visitor: (node: MarkdownAstNode) => void,
+) {
+  visitor(node);
+  node.children?.forEach((child) => visitMarkdownAst(child, visitor));
+}
+
+function shouldTrackHeading({
+  className,
+  id,
+}: {
+  className?: string;
+  id?: string;
+}) {
+  if (!id || id === "user-content-footnote-label") {
+    return undefined;
   }
 
-  if (token.startsWith("`") && token.endsWith("`")) {
-    return <code key={key}>{token.slice(1, -1)}</code>;
+  if (className?.split(" ").includes("sr-only")) {
+    return undefined;
   }
 
-  if (
-    (token.startsWith("**") && token.endsWith("**")) ||
-    (token.startsWith("__") && token.endsWith("__"))
-  ) {
-    return (
-      <strong key={key}>
-        {renderInline(token.slice(2, -2), `${key}-strong`)}
-      </strong>
-    );
-  }
-
-  if (
-    (token.startsWith("*") && token.endsWith("*")) ||
-    (token.startsWith("_") && token.endsWith("_"))
-  ) {
-    return <em key={key}>{renderInline(token.slice(1, -1), `${key}-em`)}</em>;
-  }
-
-  return token;
+  return true;
 }

@@ -49,7 +49,10 @@ import {
   isMarkdownFile,
 } from "@/lib/markdown/document";
 import { parseMarkdown } from "@/lib/markdown/parse";
-import { getReadableChunks } from "@/lib/markdown/speech";
+import {
+  getReadableChunks,
+  rememberReadableSelection,
+} from "@/lib/markdown/speech";
 import { getDocumentStats } from "@/lib/markdown/stats";
 import type {
   DocumentStats,
@@ -104,7 +107,6 @@ export function MarkdownReader() {
     );
   }, [activeTab.id, readerState.tabs, splitTabId]);
   const activeModel = useReaderTabModel(activeTab);
-  const splitModel = useReaderTabModel(splitTab);
 
   function updateTab(tabId: string, updates: Partial<ReaderTab>) {
     setReaderState((currentState) => {
@@ -128,6 +130,31 @@ export function MarkdownReader() {
       file: nextFile,
       view: "preview",
     });
+  }
+
+  function editTabContent(tabId: string, content: string) {
+    const size = new Blob([content]).size;
+
+    setReaderState((currentState) => ({
+      ...currentState,
+      tabs: currentState.tabs.map((tab) => {
+        if (tab.id !== tabId || !tab.file) {
+          return tab;
+        }
+
+        return {
+          ...tab,
+          activeHeadingId: null,
+          error: null,
+          file: {
+            ...tab.file,
+            content,
+            lastModified: Date.now(),
+            size,
+          },
+        };
+      }),
+    }));
   }
 
   async function loadFile(
@@ -463,9 +490,8 @@ export function MarkdownReader() {
                 className="hidden lg:flex"
                 onCloseSplit={() => setSplitTabId(null)}
                 onSelectSplitTab={setSplitTabId}
-                primaryModel={activeModel}
+                onSourceChange={editTabContent}
                 primaryTab={activeTab}
-                secondaryModel={splitModel}
                 secondaryTab={splitTab}
                 tabs={readerState.tabs}
                 updateTab={updateTab}
@@ -482,6 +508,7 @@ export function MarkdownReader() {
                 onChooseFile={openFilePicker}
                 onOpenPaste={() => setIsPasteDialogOpen(true)}
                 onReset={resetReader}
+                onSourceChange={editTabContent}
                 updateTab={updateTab}
               />
             </>
@@ -498,6 +525,7 @@ export function MarkdownReader() {
               onChooseFile={openFilePicker}
               onOpenPaste={() => setIsPasteDialogOpen(true)}
               onReset={resetReader}
+              onSourceChange={editTabContent}
               updateTab={updateTab}
             />
           )}
@@ -555,6 +583,7 @@ function SingleReaderView({
   onChooseFile,
   onOpenPaste,
   onReset,
+  onSourceChange,
   updateTab,
 }: {
   activeModel: ReaderTabModel;
@@ -568,6 +597,7 @@ function SingleReaderView({
   onChooseFile: () => void;
   onOpenPaste: () => void;
   onReset: () => void;
+  onSourceChange: (tabId: string, content: string) => void;
   updateTab: (tabId: string, updates: Partial<ReaderTab>) => void;
 }) {
   const file = activeTab.file;
@@ -637,7 +667,7 @@ function SingleReaderView({
             >
               {file ? (
                 <MarkdownPreview
-                  blocks={activeModel.blocks}
+                  content={file.content}
                   onActiveHeadingChange={(headingId) =>
                     updateTab(activeTab.id, { activeHeadingId: headingId })
                   }
@@ -672,7 +702,10 @@ function SingleReaderView({
             value="source"
             className="mt-0 min-h-0 flex-1 overflow-hidden"
           >
-            <SourceView content={file.content} />
+            <SourceView
+              content={file.content}
+              onChange={(content) => onSourceChange(activeTab.id, content)}
+            />
           </TabsContent>
         ) : null}
       </section>
@@ -685,9 +718,8 @@ function SplitReaderView({
   className,
   onCloseSplit,
   onSelectSplitTab,
-  primaryModel,
+  onSourceChange,
   primaryTab,
-  secondaryModel,
   secondaryTab,
   tabs,
   updateTab,
@@ -696,9 +728,8 @@ function SplitReaderView({
   className?: string;
   onCloseSplit: () => void;
   onSelectSplitTab: (tabId: string) => void;
-  primaryModel: ReaderTabModel;
+  onSourceChange: (tabId: string, content: string) => void;
   primaryTab: ReaderTab;
-  secondaryModel: ReaderTabModel;
   secondaryTab: ReaderTab;
   tabs: ReaderTab[];
   updateTab: (tabId: string, updates: Partial<ReaderTab>) => void;
@@ -711,7 +742,7 @@ function SplitReaderView({
       <ResizablePanel defaultSize={50} minSize={35}>
         <SplitReaderPane
           label="Active tab"
-          model={primaryModel}
+          onSourceChange={onSourceChange}
           tab={primaryTab}
           updateTab={updateTab}
         />
@@ -721,9 +752,9 @@ function SplitReaderView({
         <SplitReaderPane
           activeTabId={activeTabId}
           label="Second tab"
-          model={secondaryModel}
           onCloseSplit={onCloseSplit}
           onSelectTab={onSelectSplitTab}
+          onSourceChange={onSourceChange}
           selectableTabs={tabs}
           tab={secondaryTab}
           updateTab={updateTab}
@@ -736,18 +767,18 @@ function SplitReaderView({
 function SplitReaderPane({
   activeTabId,
   label,
-  model,
   onCloseSplit,
   onSelectTab,
+  onSourceChange,
   selectableTabs,
   tab,
   updateTab,
 }: {
   activeTabId?: string;
   label: string;
-  model: ReaderTabModel;
   onCloseSplit?: () => void;
   onSelectTab?: (tabId: string) => void;
+  onSourceChange: (tabId: string, content: string) => void;
   selectableTabs?: ReaderTab[];
   tab: ReaderTab;
   updateTab: (tabId: string, updates: Partial<ReaderTab>) => void;
@@ -856,7 +887,7 @@ function SplitReaderPane({
           >
             {file ? (
               <MarkdownPreview
-                blocks={model.blocks}
+                content={file.content}
                 onActiveHeadingChange={(headingId) =>
                   updateTab(tab.id, { activeHeadingId: headingId })
                 }
@@ -878,22 +909,40 @@ function SplitReaderPane({
           value="source"
           className="mt-0 min-h-0 flex-1 overflow-hidden"
         >
-          <SourceView content={file.content} />
+          <SourceView
+            content={file.content}
+            onChange={(content) => onSourceChange(tab.id, content)}
+          />
         </TabsContent>
       ) : null}
     </Tabs>
   );
 }
 
-function SourceView({ content }: { content: string }) {
+function SourceView({
+  content,
+  onChange,
+}: {
+  content: string;
+  onChange: (content: string) => void;
+}) {
   return (
-    <ScrollArea className="h-full">
-      <pre
-        className="min-h-full overflow-x-auto bg-muted/30 p-5 font-mono text-xs leading-relaxed text-foreground sm:p-8"
+    <div className="h-full bg-muted/30">
+      <textarea
+        aria-label="Editable markdown source"
+        className="h-full min-h-full w-full resize-none overflow-auto bg-transparent p-5 font-mono text-xs leading-relaxed text-foreground caret-[#03444A] outline-none selection:bg-[#58D1E2]/30 placeholder:text-muted-foreground dark:caret-[#58D1E2] sm:p-8"
         data-readable-root="source"
-      >
-        {content}
-      </pre>
-    </ScrollArea>
+        onChange={(event) => onChange(event.currentTarget.value)}
+        onSelect={(event) => {
+          const textarea = event.currentTarget;
+
+          rememberReadableSelection(
+            textarea.value.slice(textarea.selectionStart, textarea.selectionEnd),
+          );
+        }}
+        spellCheck={false}
+        value={content}
+      />
+    </div>
   );
 }
