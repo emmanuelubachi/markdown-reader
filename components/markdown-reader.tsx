@@ -19,6 +19,7 @@ import {
   Pause,
   Play,
   Plus,
+  Search,
   Square,
   Upload,
   Volume2,
@@ -33,14 +34,6 @@ import {
 } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -376,35 +369,103 @@ export function MarkdownReader() {
 
   return (
     <main
-      className="core-app-shell min-h-screen px-4 py-4 text-foreground sm:px-6 lg:h-screen lg:overflow-hidden lg:px-8"
+      className="core-app-shell flex h-screen flex-col overflow-hidden text-foreground"
       onPaste={handlePaste}
     >
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-7xl flex-col gap-4 lg:h-full lg:min-h-0">
-        <header className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
-              <BookOpen className="size-5" aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-semibold tracking-normal sm:text-2xl">
-                Markdown Reader
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Local preview for readable markdown files
-              </p>
-            </div>
-          </div>
-          <ModeToggle />
-        </header>
+      <Tabs
+        className="flex min-h-0 flex-1 flex-col gap-0"
+        onValueChange={(value) =>
+          updateTab(activeTab.id, {
+            view: value === "source" && file ? "source" : "preview",
+          })
+        }
+        value={documentView}
+      >
+        {/* Browser chrome: tab strip + address-bar toolbar */}
+        <div className="shrink-0 border-b border-border/70 bg-muted/40 backdrop-blur supports-[backdrop-filter]:bg-muted/30">
+          <ReaderTabs
+            activeTabId={readerState.activeTabId}
+            onCloseTab={closeTab}
+            onNewTab={createNewTab}
+            onPasteMarkdown={() => void pasteMarkdownFromClipboard(activeTab.id)}
+            onSelectTab={selectTab}
+            tabs={readerState.tabs}
+          />
 
-        <ReaderTabs
-          activeTabId={readerState.activeTabId}
-          onCloseTab={closeTab}
-          onNewTab={createNewTab}
-          onPasteMarkdown={() => void pasteMarkdownFromClipboard(activeTab.id)}
-          onSelectTab={selectTab}
-          tabs={readerState.tabs}
-        />
+          <div className="flex items-center gap-2 px-2.5 py-2 sm:px-3">
+            <div className="hidden items-center gap-1.5 text-muted-foreground sm:flex">
+              <div className="grid size-8 place-items-center rounded-md border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
+                <BookOpen className="size-4" aria-hidden="true" />
+              </div>
+            </div>
+
+            {/* Address bar */}
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border/80 bg-background/90 px-3 py-1.5 shadow-xs ring-1 ring-foreground/5">
+              {file ? (
+                <FileText
+                  className="size-4 shrink-0 text-[#03444A] dark:text-[#58D1E2]"
+                  aria-hidden="true"
+                />
+              ) : (
+                <Search
+                  className="size-4 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              )}
+              <span className="truncate text-sm font-medium">
+                {file?.name ?? "Markdown Reader"}
+              </span>
+              <span className="ml-auto hidden shrink-0 truncate text-xs text-muted-foreground md:inline">
+                {file
+                  ? `${stats.words.toLocaleString()} words · ${stats.readingMinutes} min read`
+                  : "Choose, drop, or paste markdown to start"}
+              </span>
+              {file ? (
+                <Badge
+                  variant="outline"
+                  className="hidden shrink-0 border-[#8EA8AC]/45 text-[#03444A] lg:inline-flex dark:text-[#58D1E2]"
+                >
+                  Local
+                </Badge>
+              ) : null}
+            </div>
+
+            <TabsList aria-label="Document view" className="shrink-0">
+              <TabsTrigger value="preview">
+                <BookOpen aria-hidden="true" />
+                <span className="hidden sm:inline">Preview</span>
+              </TabsTrigger>
+              {file ? (
+                <TabsTrigger value="source">
+                  <Braces aria-hidden="true" />
+                  <span className="hidden sm:inline">Source</span>
+                </TabsTrigger>
+              ) : null}
+            </TabsList>
+
+            {file ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      aria-label="Clear current tab"
+                      className="shrink-0"
+                      onClick={resetReader}
+                      size="icon"
+                      type="button"
+                      variant="outline"
+                    />
+                  }
+                >
+                  <X aria-hidden="true" />
+                </TooltipTrigger>
+                <TooltipContent>Close document</TooltipContent>
+              </Tooltip>
+            ) : null}
+
+            <ModeToggle />
+          </div>
+        </div>
 
         <input
           ref={inputRef}
@@ -419,61 +480,53 @@ export function MarkdownReader() {
           type="file"
         />
 
-        <section
-          className={cn(
-            "grid min-h-0 flex-1 gap-4 lg:h-full",
-            file ? "lg:grid-cols-[340px_minmax(0,1fr)]" : "lg:grid-cols-1",
-          )}
-        >
-          {file ? (
-            <aside className="flex min-h-0 flex-col gap-4 lg:h-full">
-              <Card className="rounded-lg" size="sm">
-                <CardHeader>
-                  <CardTitle>File</CardTitle>
-                  <CardDescription>Nothing is uploaded to a server.</CardDescription>
-                  <CardAction>
-                    <Badge
-                      variant="outline"
-                      className="border-[#8EA8AC]/45 text-[#03444A] dark:text-[#58D1E2]"
-                    >
-                      Local
-                    </Badge>
-                  </CardAction>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {error ? (
-                    <Alert variant="destructive">
-                      <AlertCircle aria-hidden="true" />
-                      <AlertTitle>File not loaded</AlertTitle>
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  ) : null}
+        {file ? (
+          <div className="shrink-0 border-b border-border/70 bg-muted/25 px-2.5 py-2 sm:px-3">
+            <ReadAloudToolbar
+              chunks={readAloudChunks}
+              key={`${activeTab.id}-${file.name}-${file.lastModified}-${file.size}`}
+            />
+          </div>
+        ) : null}
 
-                  <FileSummary
-                    file={file}
-                    onReset={resetReader}
-                    stats={stats}
-                  />
+        {/* Body: sidebar + content viewport */}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {file ? (
+            <aside className="hidden w-72 shrink-0 flex-col overflow-hidden border-r border-border/70 bg-card/40 lg:flex xl:w-80">
+              <div className="space-y-3 border-b border-border/70 p-3">
+                {error ? (
+                  <Alert variant="destructive">
+                    <AlertCircle aria-hidden="true" />
+                    <AlertTitle>File not loaded</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                ) : null}
+
+                <FileSummary file={file} onReset={resetReader} stats={stats} />
+
+                <div className="grid grid-cols-2 gap-2">
                   <Button
-                    className="w-full justify-start"
+                    className="justify-center"
                     onClick={openFilePicker}
+                    size="sm"
                     type="button"
                     variant="outline"
                   >
                     <Upload aria-hidden="true" />
-                    Open file in this tab
+                    Open
                   </Button>
                   <Button
-                    className="w-full justify-start"
+                    className="justify-center"
                     onClick={() => void pasteMarkdownFromClipboard(activeTab.id)}
+                    size="sm"
                     type="button"
                     variant="outline"
                   >
                     <ClipboardPaste aria-hidden="true" />
-                    Paste into this tab
+                    Paste
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               <Outline
                 activeHeadingId={outlineActiveHeadingId}
@@ -482,121 +535,71 @@ export function MarkdownReader() {
             </aside>
           ) : null}
 
-          <section className="flex min-h-[580px] flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs ring-1 ring-foreground/5 lg:min-h-0">
-            <Tabs
-              className="flex min-h-0 flex-1 flex-col"
-              onValueChange={(value) =>
-                updateTab(activeTab.id, {
-                  view: value === "source" && file ? "source" : "preview",
-                })
-              }
-              value={documentView}
+          <section className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card text-card-foreground">
+            <TabsContent
+              value="preview"
+              className="mt-0 min-h-0 flex-1 overflow-hidden"
             >
-              <div className="border-b px-4 py-3 sm:px-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {file?.name ?? "No file selected"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {file
-                        ? `${stats.words.toLocaleString()} words · ${stats.readingMinutes} min read`
-                        : "Choose, drop, or paste markdown to start"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <TabsList aria-label="Document view">
-                      <TabsTrigger value="preview">
-                        <BookOpen aria-hidden="true" />
-                        Preview
-                      </TabsTrigger>
-                      {file ? (
-                        <TabsTrigger value="source">
-                          <Braces aria-hidden="true" />
-                          Source
-                        </TabsTrigger>
+              <ScrollArea className="h-full">
+                <div
+                  className={cn(
+                    file
+                      ? "mx-auto w-full max-w-3xl px-5 py-8 sm:px-8 lg:px-10"
+                      : "flex min-h-full w-full items-center justify-center p-4 sm:p-6",
+                  )}
+                >
+                  {file ? (
+                    <MarkdownPreview
+                      blocks={blocks}
+                      onActiveHeadingChange={(headingId) =>
+                        updateTab(activeTab.id, { activeHeadingId: headingId })
+                      }
+                    />
+                  ) : (
+                    <div className="flex w-full max-w-md flex-col gap-4">
+                      {error ? (
+                        <Alert variant="destructive">
+                          <AlertCircle aria-hidden="true" />
+                          <AlertTitle>File not loaded</AlertTitle>
+                          <AlertDescription>{error}</AlertDescription>
+                        </Alert>
                       ) : null}
-                    </TabsList>
-                    {file ? (
-                      <Button
-                        aria-label="Clear current tab"
-                        onClick={resetReader}
-                        size="icon"
-                        type="button"
-                        variant="outline"
-                      >
-                        <X aria-hidden="true" />
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-                {file ? (
-                  <ReadAloudToolbar
-                    chunks={readAloudChunks}
-                    key={`${activeTab.id}-${file.name}-${file.lastModified}-${file.size}`}
-                  />
-                ) : null}
-              </div>
-
-              <TabsContent value="preview" className="min-h-0 overflow-hidden">
-                <ScrollArea className="h-[calc(100vh-12rem)] min-h-[500px] lg:h-full lg:min-h-0">
-                  <div
-                    className={cn(
-                      file
-                        ? "mx-auto w-full max-w-3xl px-5 py-8 sm:px-8 lg:px-10"
-                        : "flex min-h-full w-full p-4 sm:p-6 lg:p-8",
-                    )}
-                  >
-                    {file ? (
-                      <MarkdownPreview
-                        blocks={blocks}
-                        onActiveHeadingChange={(headingId) =>
-                          updateTab(activeTab.id, { activeHeadingId: headingId })
+                      <EmptyPreview
+                        isDragging={isDragging}
+                        onChooseFile={openFilePicker}
+                        onDragEnter={handleDragEnter}
+                        onDragLeave={handleDragLeave}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={handleDrop}
+                        onPaste={handlePaste}
+                        onPasteMarkdown={() =>
+                          void pasteMarkdownFromClipboard(activeTab.id)
                         }
                       />
-                    ) : (
-                      <div className="flex min-h-full w-full flex-1 flex-col gap-4">
-                        {error ? (
-                          <Alert variant="destructive">
-                            <AlertCircle aria-hidden="true" />
-                            <AlertTitle>File not loaded</AlertTitle>
-                            <AlertDescription>{error}</AlertDescription>
-                          </Alert>
-                        ) : null}
-                        <EmptyPreview
-                          isDragging={isDragging}
-                          onChooseFile={openFilePicker}
-                          onDragEnter={handleDragEnter}
-                          onDragLeave={handleDragLeave}
-                          onDragOver={(event) => event.preventDefault()}
-                          onDrop={handleDrop}
-                          onPaste={handlePaste}
-                          onPasteMarkdown={() =>
-                            void pasteMarkdownFromClipboard(activeTab.id)
-                          }
-                        />
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {file ? (
+              <TabsContent
+                value="source"
+                className="mt-0 min-h-0 flex-1 overflow-hidden"
+              >
+                <ScrollArea className="h-full">
+                  <pre
+                    className="min-h-full overflow-x-auto bg-muted/30 p-5 font-mono text-xs leading-relaxed text-foreground sm:p-8"
+                    data-readable-root="source"
+                  >
+                    {file.content}
+                  </pre>
                 </ScrollArea>
               </TabsContent>
-
-              {file ? (
-                <TabsContent value="source" className="min-h-0 overflow-hidden">
-                  <ScrollArea className="h-[calc(100vh-12rem)] min-h-[500px] lg:h-full lg:min-h-0">
-                    <pre
-                      className="min-h-full overflow-x-auto bg-muted/30 p-5 font-mono text-xs leading-relaxed text-foreground sm:p-8"
-                      data-readable-root="source"
-                    >
-                      {file.content}
-                    </pre>
-                  </ScrollArea>
-                </TabsContent>
-              ) : null}
-            </Tabs>
+            ) : null}
           </section>
-        </section>
-      </div>
+        </div>
+      </Tabs>
     </main>
   );
 }
@@ -617,57 +620,60 @@ function ReaderTabs({
   tabs: ReaderTab[];
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-2 rounded-lg border bg-card/80 p-2 text-card-foreground shadow-xs ring-1 ring-foreground/5">
+    <div className="flex items-end gap-1 px-2 pt-2">
       <div
         aria-label="Reader tabs"
-        className="flex min-w-0 flex-1 gap-1 overflow-x-auto"
+        className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto"
         role="tablist"
       >
         {tabs.map((tab, index) => {
           const isActive = tab.id === activeTabId;
           const label = getReaderTabLabel(tab, index);
           const canClose = tabs.length > 1 || Boolean(tab.file) || Boolean(tab.error);
-          const TabIcon = tab.file ? FileText : Plus;
 
           return (
             <div
               className={cn(
-                "flex min-w-40 max-w-64 shrink-0 items-center rounded-md border text-sm transition",
+                "group relative flex min-w-36 max-w-56 shrink-0 items-center rounded-t-lg border border-b-0 text-sm transition",
                 isActive
-                  ? "border-[#58D1E2]/40 bg-background text-foreground shadow-xs"
-                  : "border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                  ? "z-10 border-border/70 bg-background text-foreground -mb-px pb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)]"
+                  : "border-transparent bg-background/40 text-muted-foreground hover:bg-background/70 hover:text-foreground",
               )}
               key={tab.id}
             >
               <button
                 aria-selected={isActive}
-                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-t-lg py-2 pl-3 pr-1.5 text-left focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
                 onClick={() => onSelectTab(tab.id)}
                 role="tab"
                 title={label}
                 type="button"
               >
-                <TabIcon
-                  className={cn(
-                    "size-3.5 shrink-0",
-                    isActive
-                      ? "text-[#03444A] dark:text-[#58D1E2]"
-                      : "text-muted-foreground",
-                  )}
-                  aria-hidden="true"
-                />
-                <span className="truncate">{label}</span>
                 {tab.error ? (
                   <AlertCircle
-                    className="ml-auto size-3.5 shrink-0 text-destructive"
+                    className="size-3.5 shrink-0 text-destructive"
                     aria-hidden="true"
                   />
-                ) : null}
+                ) : (
+                  <FileText
+                    className={cn(
+                      "size-3.5 shrink-0",
+                      isActive
+                        ? "text-[#03444A] dark:text-[#58D1E2]"
+                        : "text-muted-foreground",
+                    )}
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="truncate">{label}</span>
               </button>
               {canClose ? (
                 <Button
                   aria-label={`Close ${label}`}
-                  className="mr-1 size-6 shrink-0"
+                  className={cn(
+                    "mr-1.5 size-5 shrink-0 opacity-70 transition group-hover:opacity-100",
+                    !isActive && "sm:opacity-0 sm:group-hover:opacity-100",
+                  )}
                   onClick={() => onCloseTab(tab.id)}
                   size="icon-sm"
                   type="button"
@@ -679,18 +685,17 @@ function ReaderTabs({
             </div>
           );
         })}
-      </div>
 
-      <div className="flex shrink-0 items-center gap-1">
         <Tooltip>
           <TooltipTrigger
             render={
               <Button
                 aria-label="New reader tab"
+                className="mb-1 ml-0.5 size-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground"
                 onClick={onNewTab}
                 size="icon-sm"
                 type="button"
-                variant="outline"
+                variant="ghost"
               />
             }
           >
@@ -698,24 +703,25 @@ function ReaderTabs({
           </TooltipTrigger>
           <TooltipContent>New tab</TooltipContent>
         </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                aria-label="Paste markdown into active tab"
-                onClick={onPasteMarkdown}
-                size="icon-sm"
-                type="button"
-                variant="outline"
-              />
-            }
-          >
-            <ClipboardPaste aria-hidden="true" />
-          </TooltipTrigger>
-          <TooltipContent>Paste into active tab</TooltipContent>
-        </Tooltip>
       </div>
+
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              aria-label="Paste markdown into active tab"
+              className="mb-1 size-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground"
+              onClick={onPasteMarkdown}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            />
+          }
+        >
+          <ClipboardPaste aria-hidden="true" />
+        </TooltipTrigger>
+        <TooltipContent>Paste into active tab</TooltipContent>
+      </Tooltip>
     </div>
   );
 }
@@ -743,7 +749,7 @@ function UploadDropZone({
     <div
       aria-label="Markdown input area"
       className={cn(
-        "relative flex min-h-[420px] w-full flex-1 flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed bg-background/70 p-8 text-center transition focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+        "relative flex w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed bg-background/70 px-6 py-10 text-center transition focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
         isDragging
           ? "border-[#58D1E2] bg-[#58D1E2]/12 text-[#03444A] shadow-[0_0_0_1px_color-mix(in_srgb,var(--core-teal)_35%,transparent)] dark:text-[#58D1E2]"
           : "border-border hover:border-[#58D1E2]/55 hover:bg-muted/35",
@@ -755,21 +761,7 @@ function UploadDropZone({
       onPaste={onPaste}
       tabIndex={0}
     >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-6 top-8 mx-auto hidden h-44 max-w-lg rounded-lg border bg-muted/25 opacity-55 sm:block"
-      >
-        <div className="border-b px-5 py-4">
-          <div className="h-3 w-2/5 rounded-full bg-muted-foreground/25" />
-        </div>
-        <div className="space-y-3 px-5 py-5">
-          <div className="h-2.5 w-5/6 rounded-full bg-muted-foreground/20" />
-          <div className="h-2.5 w-3/4 rounded-full bg-muted-foreground/15" />
-          <div className="h-2.5 w-4/5 rounded-full bg-muted-foreground/15" />
-        </div>
-      </div>
-
-      <div className="relative z-10 flex max-w-xl flex-col items-center">
+      <div className="relative z-10 flex max-w-md flex-col items-center">
         <span className="grid size-14 place-items-center rounded-lg border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
           <Upload className="size-7" aria-hidden="true" />
         </span>
@@ -868,7 +860,7 @@ function ReadAloudToolbar({ chunks }: { chunks: string[] }) {
   );
 
   return (
-    <div className="mt-3 rounded-md border bg-background/70 p-2.5">
+    <div className="rounded-md border bg-background/70 p-2.5">
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div className="min-w-0 space-y-2">
           <div className="flex min-w-0 items-center gap-2">
@@ -1171,13 +1163,15 @@ function Outline({
   headings: Extract<MarkdownBlock, { type: "heading" }>[];
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded-lg border bg-card p-4 text-card-foreground shadow-xs ring-1 ring-foreground/5">
-      <div className="flex items-center gap-2">
+    <div className="flex min-h-0 flex-1 flex-col p-3 text-card-foreground">
+      <div className="flex items-center gap-2 px-1 pb-1">
         <ListTree className="size-4 text-[#03444A] dark:text-[#58D1E2]" />
-        <h2 className="text-sm font-medium">Outline</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Outline
+        </h2>
       </div>
       {headings.length > 0 ? (
-        <nav className="mt-3 min-h-0 flex-1 space-y-1 overflow-auto pr-1">
+        <nav className="mt-1 min-h-0 flex-1 space-y-0.5 overflow-auto pr-1">
           {headings.slice(0, 36).map((heading) => {
             const isActive = heading.id === activeHeadingId;
 
