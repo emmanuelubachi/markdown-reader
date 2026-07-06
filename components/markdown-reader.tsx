@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ClipboardEvent,
   type DragEvent,
   type ReactNode,
 } from "react";
@@ -12,6 +13,7 @@ import {
   AlertCircle,
   BookOpen,
   Braces,
+  ClipboardPaste,
   FileText,
   ListTree,
   Pause,
@@ -87,6 +89,7 @@ type LoadedFile = {
   lastModified: number;
   name: string;
   size: number;
+  source: "file" | "paste";
 };
 
 type DocumentStats = {
@@ -106,6 +109,9 @@ export function MarkdownReader() {
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
+  const [documentView, setDocumentView] = useState<"preview" | "source">(
+    "preview",
+  );
 
   const blocks = useMemo(
     () => parseMarkdown(file?.content ?? ""),
@@ -153,11 +159,51 @@ export function MarkdownReader() {
         lastModified: selectedFile.lastModified,
         name: selectedFile.name,
         size: selectedFile.size,
+        source: "file",
       });
       setError(null);
       setActiveHeadingId(null);
+      setDocumentView("preview");
     } catch {
       setError("The file could not be read. Try exporting it again.");
+    }
+  }
+
+  function loadMarkdownText(content: string) {
+    if (!content.trim()) {
+      setError("The clipboard does not contain any markdown text.");
+      return;
+    }
+
+    const size = new Blob([content]).size;
+
+    if (size > MAX_FILE_SIZE) {
+      setError("The pasted markdown is larger than 5 MB. Try a smaller selection.");
+      return;
+    }
+
+    setFile({
+      content,
+      lastModified: Date.now(),
+      name: getPastedDocumentName(content),
+      size,
+      source: "paste",
+    });
+    setError(null);
+    setActiveHeadingId(null);
+    setDocumentView("preview");
+  }
+
+  async function pasteMarkdownFromClipboard() {
+    if (!navigator.clipboard?.readText) {
+      setError("Clipboard paste is unavailable in this browser.");
+      return;
+    }
+
+    try {
+      loadMarkdownText(await navigator.clipboard.readText());
+    } catch {
+      setError("Clipboard access was blocked. Try pasting with the keyboard.");
     }
   }
 
@@ -172,6 +218,12 @@ export function MarkdownReader() {
 
   function handleDragLeave(event: DragEvent<HTMLElement>) {
     event.preventDefault();
+    const nextTarget = event.relatedTarget;
+
+    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+      return;
+    }
+
     setIsDragging(false);
   }
 
@@ -185,9 +237,21 @@ export function MarkdownReader() {
     setFile(null);
     setError(null);
     setActiveHeadingId(null);
+    setDocumentView("preview");
     if (inputRef.current) {
       inputRef.current.value = "";
     }
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLElement>) {
+    const pastedText = event.clipboardData.getData("text/plain");
+
+    if (!pastedText) {
+      return;
+    }
+
+    event.preventDefault();
+    loadMarkdownText(pastedText);
   }
 
   return (
@@ -275,7 +339,13 @@ export function MarkdownReader() {
           ) : null}
 
           <section className="flex min-h-[580px] flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs ring-1 ring-foreground/5 lg:min-h-0">
-            <Tabs defaultValue="preview" className="flex min-h-0 flex-1 flex-col">
+            <Tabs
+              className="flex min-h-0 flex-1 flex-col"
+              onValueChange={(value) =>
+                setDocumentView(value === "source" && file ? "source" : "preview")
+              }
+              value={documentView}
+            >
               <div className="border-b px-4 py-3 sm:px-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -285,7 +355,7 @@ export function MarkdownReader() {
                     <p className="text-xs text-muted-foreground">
                       {file
                         ? `${stats.words.toLocaleString()} words · ${stats.readingMinutes} min read`
-                        : "Drop a markdown file into the preview area"}
+                        : "Choose, drop, or paste markdown to start"}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -294,10 +364,12 @@ export function MarkdownReader() {
                         <BookOpen aria-hidden="true" />
                         Preview
                       </TabsTrigger>
-                      <TabsTrigger value="source">
-                        <Braces aria-hidden="true" />
-                        Source
-                      </TabsTrigger>
+                      {file ? (
+                        <TabsTrigger value="source">
+                          <Braces aria-hidden="true" />
+                          Source
+                        </TabsTrigger>
+                      ) : null}
                     </TabsList>
                     {file ? (
                       <Button
@@ -322,14 +394,20 @@ export function MarkdownReader() {
 
               <TabsContent value="preview" className="min-h-0 overflow-hidden">
                 <ScrollArea className="h-[calc(100vh-12rem)] min-h-[500px] lg:h-full lg:min-h-0">
-                  <div className="mx-auto w-full max-w-3xl px-5 py-8 sm:px-8 lg:px-10">
+                  <div
+                    className={cn(
+                      file
+                        ? "mx-auto w-full max-w-3xl px-5 py-8 sm:px-8 lg:px-10"
+                        : "flex min-h-full w-full p-4 sm:p-6 lg:p-8",
+                    )}
+                  >
                     {file ? (
                       <MarkdownPreview
                         blocks={blocks}
                         onActiveHeadingChange={setActiveHeadingId}
                       />
                     ) : (
-                      <div className="space-y-4">
+                      <div className="flex min-h-full w-full flex-1 flex-col gap-4">
                         {error ? (
                           <Alert variant="destructive">
                             <AlertCircle aria-hidden="true" />
@@ -339,11 +417,13 @@ export function MarkdownReader() {
                         ) : null}
                         <EmptyPreview
                           isDragging={isDragging}
-                          onClick={openFilePicker}
+                          onChooseFile={openFilePicker}
                           onDragEnter={handleDragEnter}
                           onDragLeave={handleDragLeave}
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={handleDrop}
+                          onPaste={handlePaste}
+                          onPasteMarkdown={() => void pasteMarkdownFromClipboard()}
                         />
                       </div>
                     )}
@@ -351,16 +431,18 @@ export function MarkdownReader() {
                 </ScrollArea>
               </TabsContent>
 
-              <TabsContent value="source" className="min-h-0 overflow-hidden">
-                <ScrollArea className="h-[calc(100vh-12rem)] min-h-[500px] lg:h-full lg:min-h-0">
-                  <pre
-                    className="min-h-full overflow-x-auto bg-muted/30 p-5 font-mono text-xs leading-relaxed text-foreground sm:p-8"
-                    data-readable-root="source"
-                  >
-                    {file?.content ?? "Open a markdown file to view its source."}
-                  </pre>
-                </ScrollArea>
-              </TabsContent>
+              {file ? (
+                <TabsContent value="source" className="min-h-0 overflow-hidden">
+                  <ScrollArea className="h-[calc(100vh-12rem)] min-h-[500px] lg:h-full lg:min-h-0">
+                    <pre
+                      className="min-h-full overflow-x-auto bg-muted/30 p-5 font-mono text-xs leading-relaxed text-foreground sm:p-8"
+                      data-readable-root="source"
+                    >
+                      {file.content}
+                    </pre>
+                  </ScrollArea>
+                </TabsContent>
+              ) : null}
             </Tabs>
           </section>
         </section>
@@ -371,51 +453,91 @@ export function MarkdownReader() {
 
 function UploadDropZone({
   isDragging,
-  label,
-  onClick,
+  onChooseFile,
   onDragEnter,
   onDragLeave,
   onDragOver,
   onDrop,
-  supportingText,
+  onPaste,
+  onPasteMarkdown,
 }: {
   isDragging: boolean;
-  label: string;
-  onClick: () => void;
+  onChooseFile: () => void;
   onDragEnter: (event: DragEvent<HTMLElement>) => void;
   onDragLeave: (event: DragEvent<HTMLElement>) => void;
   onDragOver: (event: DragEvent<HTMLElement>) => void;
   onDrop: (event: DragEvent<HTMLElement>) => void;
-  supportingText: string;
+  onPaste: (event: ClipboardEvent<HTMLElement>) => void;
+  onPasteMarkdown: () => void;
 }) {
   return (
-    <button
+    <div
+      aria-label="Markdown input area"
       className={cn(
-        "flex w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-background/70 text-center transition focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-        "min-h-[420px] p-8",
+        "relative flex min-h-[420px] w-full flex-1 flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed bg-background/70 p-8 text-center transition focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
         isDragging
-          ? "border-[#58D1E2] bg-[#58D1E2]/12 text-[#03444A] dark:text-[#58D1E2]"
+          ? "border-[#58D1E2] bg-[#58D1E2]/12 text-[#03444A] shadow-[0_0_0_1px_color-mix(in_srgb,var(--core-teal)_35%,transparent)] dark:text-[#58D1E2]"
           : "border-border hover:border-[#58D1E2]/55 hover:bg-muted/35",
       )}
-      onClick={onClick}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      type="button"
+      onPaste={onPaste}
+      tabIndex={0}
     >
-      <span
-        className="grid size-14 place-items-center rounded-lg border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]"
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-6 top-8 mx-auto hidden h-44 max-w-lg rounded-lg border bg-muted/25 opacity-55 sm:block"
       >
-        <Upload className="size-7" aria-hidden="true" />
-      </span>
-      <span className="space-y-1">
-        <span className="block text-lg font-medium">{label}</span>
-        <span className="block text-sm text-muted-foreground">
-          {supportingText}
+        <div className="border-b px-5 py-4">
+          <div className="h-3 w-2/5 rounded-full bg-muted-foreground/25" />
+        </div>
+        <div className="space-y-3 px-5 py-5">
+          <div className="h-2.5 w-5/6 rounded-full bg-muted-foreground/20" />
+          <div className="h-2.5 w-3/4 rounded-full bg-muted-foreground/15" />
+          <div className="h-2.5 w-4/5 rounded-full bg-muted-foreground/15" />
+        </div>
+      </div>
+
+      <div className="relative z-10 flex max-w-xl flex-col items-center">
+        <span className="grid size-14 place-items-center rounded-lg border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
+          <Upload className="size-7" aria-hidden="true" />
         </span>
-      </span>
-    </button>
+        <h2 className="mt-5 text-xl font-semibold">Open a Markdown file</h2>
+        <p className="mt-2 max-w-md text-sm text-muted-foreground">
+          Drop a markdown file anywhere in this panel, choose a file, or paste
+          copied markdown text.
+        </p>
+
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+          <Button onClick={onChooseFile} type="button">
+            <Upload aria-hidden="true" />
+            Choose file
+          </Button>
+          <Button onClick={onPasteMarkdown} type="button" variant="outline">
+            <ClipboardPaste aria-hidden="true" />
+            Paste markdown
+          </Button>
+        </div>
+
+        <p className="mt-4 text-xs text-muted-foreground">
+          Files and pasted text stay in your browser. Nothing is uploaded.
+        </p>
+
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          {[".md", ".markdown", "Max 5 MB", "Local only"].map((label) => (
+            <Badge
+              className="border-[#8EA8AC]/35 bg-background/70 text-muted-foreground"
+              key={label}
+              variant="outline"
+            >
+              {label}
+            </Badge>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -437,7 +559,9 @@ function FileSummary({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{file.name}</p>
           <p className="text-xs text-muted-foreground">
-            {formatBytes(file.size)} · edited {formatDate(file.lastModified)}
+            {formatBytes(file.size)} ·{" "}
+            {file.source === "paste" ? "pasted" : "edited"}{" "}
+            {formatDate(file.lastModified)}
           </p>
         </div>
         <Button
@@ -819,29 +943,33 @@ function Outline({
 
 function EmptyPreview({
   isDragging,
-  onClick,
+  onChooseFile,
   onDragEnter,
   onDragLeave,
   onDragOver,
   onDrop,
+  onPaste,
+  onPasteMarkdown,
 }: {
   isDragging: boolean;
-  onClick: () => void;
+  onChooseFile: () => void;
   onDragEnter: (event: DragEvent<HTMLElement>) => void;
   onDragLeave: (event: DragEvent<HTMLElement>) => void;
   onDragOver: (event: DragEvent<HTMLElement>) => void;
   onDrop: (event: DragEvent<HTMLElement>) => void;
+  onPaste: (event: ClipboardEvent<HTMLElement>) => void;
+  onPasteMarkdown: () => void;
 }) {
   return (
     <UploadDropZone
       isDragging={isDragging}
-      label="Drop markdown here"
-      onClick={onClick}
+      onChooseFile={onChooseFile}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      supportingText="or choose a local .md file"
+      onPaste={onPaste}
+      onPasteMarkdown={onPasteMarkdown}
     />
   );
 }
@@ -1558,6 +1686,15 @@ function isMarkdownFile(file: File) {
     file.type === "text/markdown" ||
     file.type === "text/plain"
   );
+}
+
+function getPastedDocumentName(content: string) {
+  const heading = content.match(/^#{1,6}\s+(.+?)\s*#*\s*$/m)?.[1];
+  const baseName = heading
+    ? toPlainSpeechText(heading).replace(/[/:*?"<>|]/g, "").trim()
+    : "Pasted markdown";
+
+  return `${baseName.slice(0, 48) || "Pasted markdown"}.md`;
 }
 
 function getDocumentStats(content: string): DocumentStats {
