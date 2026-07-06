@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -13,8 +14,12 @@ import {
   Braces,
   FileText,
   Heading2,
+  Pause,
+  Play,
   RotateCcw,
+  Square,
   Upload,
+  Volume2,
   X,
 } from "lucide-react";
 
@@ -36,6 +41,11 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type MarkdownBlock =
@@ -85,6 +95,8 @@ type DocumentStats = {
   words: number;
 };
 
+type ReadAloudStatus = "idle" | "playing" | "paused" | "unsupported";
+
 const ACCEPTED_FILE_TYPES = ".md,.markdown,.mdown,.mkd,text/markdown,text/plain";
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -108,6 +120,8 @@ export function MarkdownReader() {
     () => blocks.filter((block) => block.type === "heading"),
     [blocks],
   );
+
+  const readAloudChunks = useMemo(() => getReadableChunks(blocks), [blocks]);
 
   async function loadFile(selectedFile: File | undefined) {
     if (!selectedFile) {
@@ -240,11 +254,17 @@ export function MarkdownReader() {
                 ) : null}
 
                 {file ? (
-                  <FileSummary
-                    file={file}
-                    onReset={resetReader}
-                    stats={stats}
-                  />
+                  <>
+                    <FileSummary
+                      file={file}
+                      onReset={resetReader}
+                      stats={stats}
+                    />
+                    <ReadAloudPanel
+                      chunks={readAloudChunks}
+                      key={`${file.name}-${file.lastModified}-${file.size}`}
+                    />
+                  </>
                 ) : null}
               </CardContent>
             </Card>
@@ -304,7 +324,10 @@ export function MarkdownReader() {
 
               <TabsContent value="source" className="min-h-0">
                 <ScrollArea className="h-[calc(100vh-12rem)] min-h-[500px]">
-                  <pre className="min-h-full overflow-x-auto bg-muted/30 p-5 font-mono text-xs leading-relaxed text-foreground sm:p-8">
+                  <pre
+                    className="min-h-full overflow-x-auto bg-muted/30 p-5 font-mono text-xs leading-relaxed text-foreground sm:p-8"
+                    data-readable-root="source"
+                  >
                     {file?.content ?? "Open a markdown file to view its source."}
                   </pre>
                 </ScrollArea>
@@ -355,6 +378,307 @@ function FileSummary({
       </dl>
     </div>
   );
+}
+
+function ReadAloudPanel({ chunks }: { chunks: string[] }) {
+  const reader = useReadAloud(chunks);
+  const hasReadableText = chunks.length > 0;
+  const isPlaying = reader.status === "playing";
+  const isPaused = reader.status === "paused";
+  const canRead = hasReadableText && reader.status !== "unsupported";
+  const currentPosition =
+    reader.status === "idle" ? 0 : Math.min(reader.currentIndex + 1, chunks.length);
+  const progress = chunks.length > 0 ? (currentPosition / chunks.length) * 100 : 0;
+  const statusText = getReadAloudStatusText(
+    reader.status,
+    currentPosition,
+    chunks.length,
+  );
+
+  return (
+    <div className="rounded-lg border bg-background/70 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Volume2 className="size-4 text-[#03444A] dark:text-[#58D1E2]" />
+            <p className="text-sm font-medium">Read aloud</p>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">{statusText}</p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  aria-label={
+                    isPlaying
+                      ? "Pause reading"
+                      : isPaused
+                        ? "Resume reading"
+                        : "Read preview aloud from selection"
+                  }
+                  disabled={!canRead}
+                  onClick={
+                    isPlaying
+                      ? reader.pause
+                      : isPaused
+                        ? reader.resume
+                        : reader.startFromSelection
+                  }
+                  size="icon-sm"
+                  type="button"
+                  variant={isPlaying ? "outline" : "default"}
+                />
+              }
+            >
+              {isPlaying ? (
+                <Pause aria-hidden="true" />
+              ) : (
+                <Play aria-hidden="true" />
+              )}
+            </TooltipTrigger>
+          <TooltipContent>
+              {isPlaying
+                ? "Pause"
+                : isPaused
+                  ? "Resume"
+                  : "Read from selection"}
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  aria-label="Stop reading"
+                  disabled={!isPlaying && !isPaused}
+                  onClick={reader.stop}
+                  size="icon-sm"
+                  type="button"
+                  variant="outline"
+                />
+              }
+            >
+              <Square aria-hidden="true" />
+            </TooltipTrigger>
+            <TooltipContent>Stop</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
+      <div
+        aria-label="Reading progress"
+        aria-valuemax={chunks.length}
+        aria-valuemin={0}
+        aria-valuenow={currentPosition}
+        className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+      >
+        <div
+          className="h-full rounded-full bg-[#03444A] transition-[width] dark:bg-[#58D1E2]"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      <div className="mt-3 flex items-center gap-3">
+        <label
+          className="shrink-0 text-xs font-medium text-muted-foreground"
+          htmlFor="read-aloud-rate"
+        >
+          Speed
+        </label>
+        <input
+          aria-label="Reading speed"
+          className="h-1.5 min-w-0 flex-1 accent-[#03444A] dark:accent-[#58D1E2]"
+          disabled={!canRead}
+          id="read-aloud-rate"
+          max="1.5"
+          min="0.75"
+          onChange={(event) => reader.setRate(Number(event.currentTarget.value))}
+          step="0.05"
+          type="range"
+          value={reader.rate}
+        />
+        <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">
+          {reader.rate.toFixed(2).replace(/0$/, "")}x
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function useReadAloud(chunks: string[]) {
+  const synthesisRef = useRef<SpeechSynthesis | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const chunksRef = useRef(chunks);
+  const shouldStopRef = useRef(false);
+  const rateRef = useRef(1);
+  const [speechStatus, setSpeechStatus] = useState<Exclude<
+    ReadAloudStatus,
+    "unsupported"
+  >>("idle");
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [rate, setRateState] = useState(1);
+  const speechSupported =
+    typeof window !== "undefined" &&
+    "speechSynthesis" in window &&
+    typeof SpeechSynthesisUtterance !== "undefined";
+  const status: ReadAloudStatus = speechSupported ? speechStatus : "unsupported";
+
+  useEffect(() => {
+    return () => {
+      shouldStopRef.current = true;
+      synthesisRef.current?.cancel();
+    };
+  }, []);
+
+  function getSynthesis() {
+    if (!speechSupported) {
+      return null;
+    }
+
+    synthesisRef.current = window.speechSynthesis;
+
+    return synthesisRef.current;
+  }
+
+  function speakChunk(index: number) {
+    const synthesis = getSynthesis();
+    const readableChunks = chunksRef.current;
+
+    if (!synthesis) {
+      return;
+    }
+
+    if (!readableChunks.length || index >= readableChunks.length) {
+      shouldStopRef.current = true;
+      utteranceRef.current = null;
+      setCurrentIndex(0);
+      setSpeechStatus("idle");
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(readableChunks[index]);
+
+    utterance.rate = rateRef.current;
+    utterance.pitch = 1;
+    utterance.onend = () => {
+      if (shouldStopRef.current || utteranceRef.current !== utterance) {
+        return;
+      }
+
+      speakChunk(index + 1);
+    };
+    utterance.onerror = () => {
+      if (shouldStopRef.current) {
+        return;
+      }
+
+      utteranceRef.current = null;
+      setSpeechStatus("idle");
+    };
+
+    shouldStopRef.current = false;
+    utteranceRef.current = utterance;
+    setCurrentIndex(index);
+    setSpeechStatus("playing");
+    synthesis.speak(utterance);
+  }
+
+  function start(startIndex = 0) {
+    const synthesis = getSynthesis();
+    const safeStartIndex = Math.min(
+      Math.max(startIndex, 0),
+      Math.max(chunksRef.current.length - 1, 0),
+    );
+
+    if (!chunksRef.current.length || !synthesis) {
+      return;
+    }
+
+    shouldStopRef.current = true;
+    synthesis.cancel();
+    shouldStopRef.current = false;
+    speakChunk(safeStartIndex);
+  }
+
+  function startFromSelection() {
+    start(getSelectedChunkIndex(chunksRef.current) ?? 0);
+  }
+
+  function pause() {
+    const synthesis = getSynthesis();
+
+    if (!synthesis || status !== "playing") {
+      return;
+    }
+
+    synthesis.pause();
+    setSpeechStatus("paused");
+  }
+
+  function resume() {
+    const synthesis = getSynthesis();
+
+    if (!synthesis || status !== "paused") {
+      return;
+    }
+
+    synthesis.resume();
+    setSpeechStatus("playing");
+  }
+
+  function stop() {
+    shouldStopRef.current = true;
+    utteranceRef.current = null;
+    synthesisRef.current?.cancel();
+    setCurrentIndex(0);
+    setSpeechStatus("idle");
+  }
+
+  function setRate(nextRate: number) {
+    const safeRate = Math.min(1.5, Math.max(0.75, nextRate));
+
+    rateRef.current = safeRate;
+    setRateState(safeRate);
+  }
+
+  return {
+    currentIndex,
+    pause,
+    rate,
+    resume,
+    setRate,
+    start,
+    startFromSelection,
+    status,
+    stop,
+  };
+}
+
+function getReadAloudStatusText(
+  status: ReadAloudStatus,
+  currentPosition: number,
+  total: number,
+) {
+  if (status === "unsupported") {
+    return "Voice reading is unavailable in this browser.";
+  }
+
+  if (total === 0) {
+    return "No readable preview text.";
+  }
+
+  if (status === "playing") {
+    return `Reading ${currentPosition} of ${total}`;
+  }
+
+  if (status === "paused") {
+    return `Paused at ${currentPosition} of ${total}`;
+  }
+
+  return `${total} ${total === 1 ? "passage" : "passages"} ready`;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -421,7 +745,7 @@ function MarkdownPreview({ blocks }: { blocks: MarkdownBlock[] }) {
   }
 
   return (
-    <article className="markdown-preview">
+    <article className="markdown-preview" data-readable-root="preview">
       {blocks.map((block, index) => renderBlock(block, index))}
     </article>
   );
@@ -542,6 +866,185 @@ function renderBlock(block: MarkdownBlock, index: number) {
         </div>
       );
   }
+}
+
+function getReadableChunks(blocks: MarkdownBlock[]) {
+  return blocks.flatMap((block) => {
+    switch (block.type) {
+      case "heading":
+      case "paragraph":
+        return splitSpeechText(block.text);
+      case "blockquote":
+        return splitSpeechText(`Quote. ${block.text}`);
+      case "list":
+        return block.items.flatMap((item, index) =>
+          splitSpeechText(`Item ${index + 1}. ${item}`),
+        );
+      case "table": {
+        const headers = block.headers.map(toPlainSpeechText);
+        const rows =
+          block.rows.length > 0
+            ? block.rows
+            : block.headers.length > 0
+              ? [block.headers]
+              : [];
+
+        return rows.flatMap((row) => {
+          const rowText = row
+            .map((cell, index) => {
+              const text = toPlainSpeechText(cell);
+              const header = headers[index];
+
+              if (!text) {
+                return "";
+              }
+
+              return header && header !== text ? `${header}: ${text}` : text;
+            })
+            .filter(Boolean)
+            .join(". ");
+
+          return splitSpeechText(rowText);
+        });
+      }
+      case "code":
+      case "hr":
+        return [];
+    }
+  });
+}
+
+function splitSpeechText(text: string) {
+  const plainText = toPlainSpeechText(text);
+
+  if (!plainText) {
+    return [];
+  }
+
+  const sentences = plainText.match(/[^.!?]+[.!?]*/g) ?? [plainText];
+  const chunks: string[] = [];
+  let currentChunk = "";
+
+  for (const sentence of sentences) {
+    const trimmedSentence = sentence.trim();
+
+    if (!trimmedSentence) {
+      continue;
+    }
+
+    const nextChunk = currentChunk
+      ? `${currentChunk} ${trimmedSentence}`
+      : trimmedSentence;
+
+    if (nextChunk.length > 220 && currentChunk) {
+      chunks.push(currentChunk);
+      currentChunk = trimmedSentence;
+    } else {
+      currentChunk = nextChunk;
+    }
+  }
+
+  if (currentChunk) {
+    chunks.push(currentChunk);
+  }
+
+  return chunks;
+}
+
+function toPlainSpeechText(text: string) {
+  return text
+    .replace(/\r\n?/g, " ")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/[*_~]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getSelectedChunkIndex(chunks: string[]) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const selection = window.getSelection();
+
+  if (!selection || selection.isCollapsed || !selectionWithinReadableRoot(selection)) {
+    return null;
+  }
+
+  const selectedText = normalizeSpeechMatch(selection.toString());
+
+  if (!selectedText) {
+    return null;
+  }
+
+  const selectedWords = selectedText.split(" ").filter(Boolean);
+  const chunkMatches = chunks.map((chunk, index) => ({
+    index,
+    text: normalizeSpeechMatch(chunk),
+  }));
+
+  const exactMatch = chunkMatches.find(
+    (chunk) => chunk.text.includes(selectedText) || selectedText.includes(chunk.text),
+  );
+
+  if (exactMatch) {
+    return exactMatch.index;
+  }
+
+  const selectedPrefix = selectedWords.slice(0, 8).join(" ");
+  const prefixMatch = chunkMatches.find(
+    (chunk) => selectedPrefix.length > 8 && chunk.text.includes(selectedPrefix),
+  );
+
+  if (prefixMatch) {
+    return prefixMatch.index;
+  }
+
+  const bestMatch = chunkMatches
+    .map((chunk) => ({
+      index: chunk.index,
+      score: getWordOverlapScore(selectedWords, chunk.text),
+    }))
+    .sort((a, b) => b.score - a.score)[0];
+
+  return bestMatch && bestMatch.score >= 2 ? bestMatch.index : null;
+}
+
+function selectionWithinReadableRoot(selection: Selection) {
+  return (
+    nodeWithinReadableRoot(selection.anchorNode) ||
+    nodeWithinReadableRoot(selection.focusNode)
+  );
+}
+
+function nodeWithinReadableRoot(node: Node | null) {
+  if (!node) {
+    return false;
+  }
+
+  const element =
+    node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+
+  return Boolean(element?.closest("[data-readable-root]"));
+}
+
+function normalizeSpeechMatch(text: string) {
+  return toPlainSpeechText(text)
+    .toLowerCase()
+    .replace(/[^a-z0-9'\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getWordOverlapScore(selectedWords: string[], chunkText: string) {
+  const chunkWords = new Set(chunkText.split(" ").filter(Boolean));
+
+  return selectedWords.reduce(
+    (score, word) => (chunkWords.has(word) ? score + 1 : score),
+    0,
+  );
 }
 
 function parseMarkdown(markdown: string): MarkdownBlock[] {
