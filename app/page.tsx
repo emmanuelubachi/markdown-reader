@@ -1,8 +1,5 @@
-import { ModeToggle } from "@/components/mode-toggle";
+import { MarkdownReader } from "@/components/markdown-reader";
+
 export default function Home() {
-  return (
-    <div>
-      <ModeToggle />
-    </div>
-  );
+  return <MarkdownReader />;
 }
