@@ -18,7 +18,7 @@ import {
   ListTree,
   Pause,
   Play,
-  RotateCcw,
+  Plus,
   Square,
   Upload,
   Volume2,
@@ -92,6 +92,21 @@ type LoadedFile = {
   source: "file" | "paste";
 };
 
+type ReaderView = "preview" | "source";
+
+type ReaderTab = {
+  activeHeadingId: null | string;
+  error: null | string;
+  file: LoadedFile | null;
+  id: string;
+  view: ReaderView;
+};
+
+type ReaderState = {
+  activeTabId: string;
+  tabs: ReaderTab[];
+};
+
 type DocumentStats = {
   lines: number;
   readingMinutes: number;
@@ -105,13 +120,25 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 export function MarkdownReader() {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<LoadedFile | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
-  const [documentView, setDocumentView] = useState<"preview" | "source">(
-    "preview",
+  const [readerState, setReaderState] = useState<ReaderState>(() => {
+    const tab = createReaderTab();
+
+    return {
+      activeTabId: tab.id,
+      tabs: [tab],
+    };
+  });
+  const activeTab = useMemo(
+    () =>
+      readerState.tabs.find((tab) => tab.id === readerState.activeTabId) ??
+      readerState.tabs[0]!,
+    [readerState.activeTabId, readerState.tabs],
   );
+  const file = activeTab.file;
+  const error = activeTab.error;
+  const activeHeadingId = activeTab.activeHeadingId;
+  const documentView = activeTab.view;
 
   const blocks = useMemo(
     () => parseMarkdown(file?.content ?? ""),
@@ -137,73 +164,111 @@ export function MarkdownReader() {
     return headings[0]?.id ?? null;
   }, [activeHeadingId, headings]);
 
-  async function loadFile(selectedFile: File | undefined) {
+  function updateTab(tabId: string, updates: Partial<ReaderTab>) {
+    setReaderState((currentState) => {
+      if (!currentState.tabs.some((tab) => tab.id === tabId)) {
+        return currentState;
+      }
+
+      return {
+        ...currentState,
+        tabs: currentState.tabs.map((tab) =>
+          tab.id === tabId ? { ...tab, ...updates } : tab,
+        ),
+      };
+    });
+  }
+
+  function loadTabContent(tabId: string, nextFile: LoadedFile) {
+    updateTab(tabId, {
+      activeHeadingId: null,
+      error: null,
+      file: nextFile,
+      view: "preview",
+    });
+  }
+
+  async function loadFile(
+    selectedFile: File | undefined,
+    tabId = activeTab.id,
+  ) {
     if (!selectedFile) {
       return;
     }
 
     if (!isMarkdownFile(selectedFile)) {
-      setError("Choose a markdown file with a .md or .markdown extension.");
+      updateTab(tabId, {
+        error: "Choose a markdown file with a .md or .markdown extension.",
+      });
       return;
     }
 
     if (selectedFile.size > MAX_FILE_SIZE) {
-      setError("This file is larger than 5 MB. Try a smaller markdown file.");
+      updateTab(tabId, {
+        error: "This file is larger than 5 MB. Try a smaller markdown file.",
+      });
       return;
     }
 
     try {
       const content = await selectedFile.text();
-      setFile({
+      loadTabContent(tabId, {
         content,
         lastModified: selectedFile.lastModified,
         name: selectedFile.name,
         size: selectedFile.size,
         source: "file",
       });
-      setError(null);
-      setActiveHeadingId(null);
-      setDocumentView("preview");
+      if (inputRef.current) {
+        inputRef.current.value = "";
+      }
     } catch {
-      setError("The file could not be read. Try exporting it again.");
+      updateTab(tabId, {
+        error: "The file could not be read. Try exporting it again.",
+      });
     }
   }
 
-  function loadMarkdownText(content: string) {
+  function loadMarkdownText(content: string, tabId = activeTab.id) {
     if (!content.trim()) {
-      setError("The clipboard does not contain any markdown text.");
+      updateTab(tabId, {
+        error: "The clipboard does not contain any markdown text.",
+      });
       return;
     }
 
     const size = new Blob([content]).size;
 
     if (size > MAX_FILE_SIZE) {
-      setError("The pasted markdown is larger than 5 MB. Try a smaller selection.");
+      updateTab(tabId, {
+        error: "The pasted markdown is larger than 5 MB. Try a smaller selection.",
+      });
       return;
     }
 
-    setFile({
+    loadTabContent(tabId, {
       content,
       lastModified: Date.now(),
       name: getPastedDocumentName(content),
       size,
       source: "paste",
     });
-    setError(null);
-    setActiveHeadingId(null);
-    setDocumentView("preview");
   }
 
-  async function pasteMarkdownFromClipboard() {
+  async function pasteMarkdownFromClipboard(tabId = activeTab.id) {
     if (!navigator.clipboard?.readText) {
-      setError("Clipboard paste is unavailable in this browser.");
+      updateTab(tabId, {
+        error: "Clipboard paste is unavailable in this browser.",
+      });
       return;
     }
 
     try {
-      loadMarkdownText(await navigator.clipboard.readText());
+      loadMarkdownText(await navigator.clipboard.readText(), tabId);
     } catch {
-      setError("Clipboard access was blocked. Try pasting with the keyboard.");
+      updateTab(tabId, {
+        error: "Clipboard access was blocked. Try pasting with the keyboard.",
+      });
     }
   }
 
@@ -230,20 +295,75 @@ export function MarkdownReader() {
   function handleDrop(event: DragEvent<HTMLElement>) {
     event.preventDefault();
     setIsDragging(false);
-    void loadFile(event.dataTransfer.files.item(0) ?? undefined);
+    void loadFile(event.dataTransfer.files.item(0) ?? undefined, activeTab.id);
   }
 
   function resetReader() {
-    setFile(null);
-    setError(null);
-    setActiveHeadingId(null);
-    setDocumentView("preview");
-    if (inputRef.current) {
-      inputRef.current.value = "";
-    }
+    updateTab(activeTab.id, {
+      activeHeadingId: null,
+      error: null,
+      file: null,
+      view: "preview",
+    });
+  }
+
+  function createNewTab() {
+    const nextTab = createReaderTab();
+
+    setReaderState((currentState) => ({
+      activeTabId: nextTab.id,
+      tabs: [...currentState.tabs, nextTab],
+    }));
+  }
+
+  function selectTab(tabId: string) {
+    setReaderState((currentState) => ({
+      ...currentState,
+      activeTabId: tabId,
+    }));
+  }
+
+  function closeTab(tabId: string) {
+    setReaderState((currentState) => {
+      const closedIndex = currentState.tabs.findIndex((tab) => tab.id === tabId);
+
+      if (closedIndex === -1) {
+        return currentState;
+      }
+
+      const nextTabs = currentState.tabs.filter((tab) => tab.id !== tabId);
+
+      if (nextTabs.length === 0) {
+        const nextTab = createReaderTab();
+
+        return {
+          activeTabId: nextTab.id,
+          tabs: [nextTab],
+        };
+      }
+
+      const activeTabStillExists = nextTabs.some(
+        (tab) => tab.id === currentState.activeTabId,
+      );
+      const fallbackTab =
+        nextTabs[Math.min(Math.max(closedIndex, 0), nextTabs.length - 1)] ??
+        nextTabs[0]!;
+
+      return {
+        activeTabId:
+          tabId === currentState.activeTabId || !activeTabStillExists
+            ? fallbackTab.id
+            : currentState.activeTabId,
+        tabs: nextTabs,
+      };
+    });
   }
 
   function handlePaste(event: ClipboardEvent<HTMLElement>) {
+    if (event.defaultPrevented || isEditablePasteTarget(event.target)) {
+      return;
+    }
+
     const pastedText = event.clipboardData.getData("text/plain");
 
     if (!pastedText) {
@@ -251,11 +371,14 @@ export function MarkdownReader() {
     }
 
     event.preventDefault();
-    loadMarkdownText(pastedText);
+    loadMarkdownText(pastedText, activeTab.id);
   }
 
   return (
-    <main className="core-app-shell min-h-screen px-4 py-4 text-foreground sm:px-6 lg:h-screen lg:overflow-hidden lg:px-8">
+    <main
+      className="core-app-shell min-h-screen px-4 py-4 text-foreground sm:px-6 lg:h-screen lg:overflow-hidden lg:px-8"
+      onPaste={handlePaste}
+    >
       <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-7xl flex-col gap-4 lg:h-full lg:min-h-0">
         <header className="flex shrink-0 flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -274,12 +397,24 @@ export function MarkdownReader() {
           <ModeToggle />
         </header>
 
+        <ReaderTabs
+          activeTabId={readerState.activeTabId}
+          onCloseTab={closeTab}
+          onNewTab={createNewTab}
+          onPasteMarkdown={() => void pasteMarkdownFromClipboard(activeTab.id)}
+          onSelectTab={selectTab}
+          tabs={readerState.tabs}
+        />
+
         <input
           ref={inputRef}
           accept={ACCEPTED_FILE_TYPES}
           className="sr-only"
           onChange={(event) =>
-            void loadFile(event.currentTarget.files?.item(0) ?? undefined)
+            void loadFile(
+              event.currentTarget.files?.item(0) ?? undefined,
+              activeTab.id,
+            )
           }
           type="file"
         />
@@ -326,7 +461,16 @@ export function MarkdownReader() {
                     variant="outline"
                   >
                     <Upload aria-hidden="true" />
-                    Replace markdown file
+                    Open file in this tab
+                  </Button>
+                  <Button
+                    className="w-full justify-start"
+                    onClick={() => void pasteMarkdownFromClipboard(activeTab.id)}
+                    type="button"
+                    variant="outline"
+                  >
+                    <ClipboardPaste aria-hidden="true" />
+                    Paste into this tab
                   </Button>
                 </CardContent>
               </Card>
@@ -342,7 +486,9 @@ export function MarkdownReader() {
             <Tabs
               className="flex min-h-0 flex-1 flex-col"
               onValueChange={(value) =>
-                setDocumentView(value === "source" && file ? "source" : "preview")
+                updateTab(activeTab.id, {
+                  view: value === "source" && file ? "source" : "preview",
+                })
               }
               value={documentView}
             >
@@ -373,7 +519,7 @@ export function MarkdownReader() {
                     </TabsList>
                     {file ? (
                       <Button
-                        aria-label="Clear file"
+                        aria-label="Clear current tab"
                         onClick={resetReader}
                         size="icon"
                         type="button"
@@ -387,7 +533,7 @@ export function MarkdownReader() {
                 {file ? (
                   <ReadAloudToolbar
                     chunks={readAloudChunks}
-                    key={`${file.name}-${file.lastModified}-${file.size}`}
+                    key={`${activeTab.id}-${file.name}-${file.lastModified}-${file.size}`}
                   />
                 ) : null}
               </div>
@@ -404,7 +550,9 @@ export function MarkdownReader() {
                     {file ? (
                       <MarkdownPreview
                         blocks={blocks}
-                        onActiveHeadingChange={setActiveHeadingId}
+                        onActiveHeadingChange={(headingId) =>
+                          updateTab(activeTab.id, { activeHeadingId: headingId })
+                        }
                       />
                     ) : (
                       <div className="flex min-h-full w-full flex-1 flex-col gap-4">
@@ -423,7 +571,9 @@ export function MarkdownReader() {
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={handleDrop}
                           onPaste={handlePaste}
-                          onPasteMarkdown={() => void pasteMarkdownFromClipboard()}
+                          onPasteMarkdown={() =>
+                            void pasteMarkdownFromClipboard(activeTab.id)
+                          }
                         />
                       </div>
                     )}
@@ -448,6 +598,125 @@ export function MarkdownReader() {
         </section>
       </div>
     </main>
+  );
+}
+
+function ReaderTabs({
+  activeTabId,
+  onCloseTab,
+  onNewTab,
+  onPasteMarkdown,
+  onSelectTab,
+  tabs,
+}: {
+  activeTabId: string;
+  onCloseTab: (tabId: string) => void;
+  onNewTab: () => void;
+  onPasteMarkdown: () => void;
+  onSelectTab: (tabId: string) => void;
+  tabs: ReaderTab[];
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-2 rounded-lg border bg-card/80 p-2 text-card-foreground shadow-xs ring-1 ring-foreground/5">
+      <div
+        aria-label="Reader tabs"
+        className="flex min-w-0 flex-1 gap-1 overflow-x-auto"
+        role="tablist"
+      >
+        {tabs.map((tab, index) => {
+          const isActive = tab.id === activeTabId;
+          const label = getReaderTabLabel(tab, index);
+          const canClose = tabs.length > 1 || Boolean(tab.file) || Boolean(tab.error);
+          const TabIcon = tab.file ? FileText : Plus;
+
+          return (
+            <div
+              className={cn(
+                "flex min-w-40 max-w-64 shrink-0 items-center rounded-md border text-sm transition",
+                isActive
+                  ? "border-[#58D1E2]/40 bg-background text-foreground shadow-xs"
+                  : "border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+              )}
+              key={tab.id}
+            >
+              <button
+                aria-selected={isActive}
+                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                onClick={() => onSelectTab(tab.id)}
+                role="tab"
+                title={label}
+                type="button"
+              >
+                <TabIcon
+                  className={cn(
+                    "size-3.5 shrink-0",
+                    isActive
+                      ? "text-[#03444A] dark:text-[#58D1E2]"
+                      : "text-muted-foreground",
+                  )}
+                  aria-hidden="true"
+                />
+                <span className="truncate">{label}</span>
+                {tab.error ? (
+                  <AlertCircle
+                    className="ml-auto size-3.5 shrink-0 text-destructive"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </button>
+              {canClose ? (
+                <Button
+                  aria-label={`Close ${label}`}
+                  className="mr-1 size-6 shrink-0"
+                  onClick={() => onCloseTab(tab.id)}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <X aria-hidden="true" />
+                </Button>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label="New reader tab"
+                onClick={onNewTab}
+                size="icon-sm"
+                type="button"
+                variant="outline"
+              />
+            }
+          >
+            <Plus aria-hidden="true" />
+          </TooltipTrigger>
+          <TooltipContent>New tab</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label="Paste markdown into active tab"
+                onClick={onPasteMarkdown}
+                size="icon-sm"
+                type="button"
+                variant="outline"
+              />
+            }
+          >
+            <ClipboardPaste aria-hidden="true" />
+          </TooltipTrigger>
+          <TooltipContent>Paste into active tab</TooltipContent>
+        </Tooltip>
+      </div>
+    </div>
   );
 }
 
@@ -565,13 +834,13 @@ function FileSummary({
           </p>
         </div>
         <Button
-          aria-label="Reset file"
+          aria-label="Clear current tab"
           onClick={onReset}
           size="icon-sm"
           type="button"
           variant="ghost"
         >
-          <RotateCcw aria-hidden="true" />
+          <X aria-hidden="true" />
         </Button>
       </div>
       <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
@@ -1685,6 +1954,36 @@ function isMarkdownFile(file: File) {
     hasMarkdownExtension ||
     file.type === "text/markdown" ||
     file.type === "text/plain"
+  );
+}
+
+function createDocumentId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `document-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function createReaderTab(): ReaderTab {
+  return {
+    activeHeadingId: null,
+    error: null,
+    file: null,
+    id: createDocumentId(),
+    view: "preview",
+  };
+}
+
+function getReaderTabLabel(tab: ReaderTab, index: number) {
+  return tab.file?.name ?? `New tab${index > 0 ? ` ${index + 1}` : ""}`;
+}
+
+function isEditablePasteTarget(target: EventTarget | null) {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    (target instanceof HTMLElement && target.isContentEditable)
   );
 }
 
