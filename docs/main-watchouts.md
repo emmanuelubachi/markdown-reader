@@ -4,7 +4,7 @@ These are the main implementation watchouts to keep visible as the reader grows.
 
 ## Markdown Fidelity
 
-The current parser is intentionally lightweight. It supports the core preview path, but it is not a full CommonMark pipeline. Before positioning the app as an "open any markdown" reader, improve or replace the parser so it handles nested lists, task lists, escaped table pipes, reference links, footnotes, and richer inline syntax.
+Baseline implemented: preview now renders through `react-markdown` with `remark-gfm`, `rehype-raw`, and `rehype-sanitize`, while outline/read-aloud metadata comes from a `unified` + `remark-gfm` AST pass. Keep testing against real-world markdown before positioning the app as an "open any markdown" reader, especially around unusual raw HTML, local image paths, math/diagrams, syntax highlighting, and very large documents.
 
 ## Mobile Read Aloud
 
