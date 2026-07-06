@@ -153,11 +153,11 @@ export function MarkdownReader() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,oklch(0.9_0.07_190_/_0.42),transparent_28rem),linear-gradient(135deg,oklch(0.99_0.01_110),oklch(0.98_0.02_250))] px-4 py-4 text-foreground dark:bg-[linear-gradient(135deg,oklch(0.16_0.02_230),oklch(0.12_0.01_120))] sm:px-6 lg:px-8">
+    <main className="core-app-shell min-h-screen px-4 py-4 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-7xl flex-col gap-4">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-teal-500/25 bg-teal-500/10 text-teal-700 dark:text-teal-300">
+            <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
               <BookOpen className="size-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">
@@ -181,7 +181,7 @@ export function MarkdownReader() {
                 <CardAction>
                   <Badge
                     variant="outline"
-                    className="border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                    className="border-[#8EA8AC]/45 text-[#03444A] dark:text-[#58D1E2]"
                   >
                     Local
                   </Badge>
@@ -203,8 +203,8 @@ export function MarkdownReader() {
                   className={cn(
                     "flex min-h-48 w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-background/70 p-6 text-center transition focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
                     isDragging
-                      ? "border-teal-500 bg-teal-500/10 text-teal-800 dark:text-teal-200"
-                      : "border-border hover:border-teal-500/60 hover:bg-teal-500/5",
+                      ? "border-[#58D1E2] bg-[#58D1E2]/15 text-[#03444A] dark:text-[#58D1E2]"
+                      : "border-border hover:border-[#58D1E2]/60 hover:bg-[#58D1E2]/5",
                   )}
                   onClick={() => inputRef.current?.click()}
                   onDragEnter={(event) => {
@@ -218,7 +218,7 @@ export function MarkdownReader() {
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={handleDrop}
                 >
-                  <span className="grid size-12 place-items-center rounded-lg border border-cyan-500/25 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300">
+                  <span className="grid size-12 place-items-center rounded-lg border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
                     <Upload className="size-6" aria-hidden="true" />
                   </span>
                   <span className="space-y-1">
@@ -329,7 +329,7 @@ function FileSummary({
   return (
     <div className="rounded-lg border bg-muted/30 p-3">
       <div className="flex items-start gap-3">
-        <div className="grid size-9 shrink-0 place-items-center rounded-md bg-background text-sky-700 ring-1 ring-border dark:text-sky-300">
+        <div className="grid size-9 shrink-0 place-items-center rounded-md bg-background text-[#03444A] ring-1 ring-border dark:text-[#58D1E2]">
           <FileText className="size-4" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
@@ -372,7 +372,7 @@ function Outline({ headings }: { headings: Extract<MarkdownBlock, { type: "headi
   return (
     <div className="rounded-lg border bg-card p-4 text-card-foreground shadow-xs ring-1 ring-foreground/5">
       <div className="flex items-center gap-2">
-        <Heading2 className="size-4 text-indigo-600 dark:text-indigo-300" />
+        <Heading2 className="size-4 text-[#03444A] dark:text-[#58D1E2]" />
         <h2 className="text-sm font-medium">Outline</h2>
       </div>
       {headings.length > 0 ? (
@@ -400,7 +400,7 @@ function Outline({ headings }: { headings: Extract<MarkdownBlock, { type: "headi
 function EmptyPreview() {
   return (
     <div className="flex min-h-[420px] flex-col items-center justify-center rounded-lg border border-dashed bg-background/60 p-8 text-center">
-      <div className="grid size-14 place-items-center rounded-lg border border-teal-500/25 bg-teal-500/10 text-teal-700 dark:text-teal-300">
+      <div className="grid size-14 place-items-center rounded-lg border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
         <FileText className="size-7" aria-hidden="true" />
       </div>
       <h2 className="mt-4 text-lg font-semibold">No markdown loaded</h2>
