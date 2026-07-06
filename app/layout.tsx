@@ -22,8 +22,34 @@ export const metadata: Metadata = {
   description: "Drop a markdown file and read a local preview.",
   icons: {
     icon: [
-      { url: "/assets/icon-dark.svg", media: "(prefers-color-scheme: light)" },
-      { url: "/assets/icon.svg", media: "(prefers-color-scheme: dark)" },
+      // Theme-aware SVG favicon (preferred by modern browsers).
+      {
+        url: "/assets/icon-dark.svg",
+        type: "image/svg+xml",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/assets/icon.svg",
+        type: "image/svg+xml",
+        media: "(prefers-color-scheme: dark)",
+      },
+      // PNG fallback for browsers without SVG favicon support.
+      {
+        url: "/assets/icon-dark.png",
+        type: "image/png",
+        sizes: "512x400",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/assets/icon.png",
+        type: "image/png",
+        sizes: "512x399",
+        media: "(prefers-color-scheme: dark)",
+      },
+    ],
+    shortcut: [{ url: "/assets/icon.png", type: "image/png" }],
+    apple: [
+      { url: "/assets/icon.png", sizes: "512x399", type: "image/png" },
     ],
   },
 };
