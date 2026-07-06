@@ -1,6 +1,16 @@
-# Markdown Reader
+<div align="center">
 
-A fast, **local-first** markdown reader with a browser-style, full-width interface. Open, drop, or paste markdown and read it in a clean, distraction-free preview — files never leave your browser, nothing is uploaded.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/assets/logo-mark.svg" />
+  <img alt="Markdown Reader logo" src="public/assets/logo-mark-dark.svg" width="88" />
+</picture>
+
+<h1>Markdown Reader</h1>
+
+<p>
+  A fast, <strong>local-first</strong> markdown reader with a browser-style, full-width interface.<br />
+  Open, drop, or paste markdown and read it in a clean, distraction-free preview — files never leave your browser, nothing is uploaded.
+</p>
 
 <p>
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white" />
@@ -13,6 +23,8 @@ A fast, **local-first** markdown reader with a browser-style, full-width interfa
   <img alt="pnpm" src="https://img.shields.io/badge/pnpm-F69220?style=for-the-badge&logo=pnpm&logoColor=white" />
 </p>
 
+</div>
+
 ## Features
 
 - 🗂️ **Tabbed documents** — open multiple markdown files at once, browser-style.
@@ -24,7 +36,7 @@ A fast, **local-first** markdown reader with a browser-style, full-width interfa
 - 🌗 **Light & dark themes** — system-aware with a manual toggle.
 - 🔒 **Fully local** — parsing and rendering happen in the browser; nothing is sent to a server.
 
-The markdown is rendered by a lightweight, dependency-free parser supporting headings, lists, tables, blockquotes, fenced code, horizontal rules, links, images, and inline formatting (bold, italic, inline code), with URL/image sanitization built in.
+Markdown is rendered with [react-markdown](https://github.com/remarkjs/react-markdown) using [remark-gfm](https://github.com/remarkjs/remark-gfm) for GitHub-flavored markdown (tables, task lists, strikethrough) and [rehype-sanitize](https://github.com/rehypejs/rehype-sanitize) plus custom URL/image sanitization for safe rendering of links and images.
 
 ## Tech Stack
 
@@ -35,6 +47,7 @@ The markdown is rendered by a lightweight, dependency-free parser supporting hea
 | Language   | [TypeScript 5](https://www.typescriptlang.org)                    |
 | Styling    | [Tailwind CSS 4](https://tailwindcss.com)                         |
 | Components | [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com) |
+| Markdown   | [react-markdown](https://github.com/remarkjs/react-markdown) · remark · rehype |
 | Icons      | [lucide-react](https://lucide.dev)                                |
 | Theming    | [next-themes](https://github.com/pacocoursey/next-themes)         |
 | Package    | [pnpm](https://pnpm.io)                                           |
@@ -78,8 +91,9 @@ hooks/
   use-read-aloud.ts           # Speech-synthesis hook
 lib/
   markdown/                   # Framework-free logic
-    parse.ts                  # Markdown parser
-    render helpers, speech, stats, sanitize, document, types
+    parse.ts                  # Markdown → block model (remark)
+    ast.ts                    # AST helpers + heading slugger
+    speech, stats, sanitize, document, types
 public/assets/                # Brand logo variants (light/dark)
 ```
 
