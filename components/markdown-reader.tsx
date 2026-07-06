@@ -27,14 +27,21 @@ import {
 } from "lucide-react";
 
 import { ModeToggle } from "@/components/mode-toggle";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Kbd } from "@/components/ui/kbd";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
@@ -108,12 +115,14 @@ type DocumentStats = {
 
 type ReadAloudStatus = "idle" | "playing" | "paused" | "unsupported";
 
-const ACCEPTED_FILE_TYPES = ".md,.markdown,.mdown,.mkd,text/markdown,text/plain";
+const ACCEPTED_FILE_TYPES =
+  ".md,.markdown,.mdown,.mkd,text/markdown,text/plain";
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 export function MarkdownReader() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [readerState, setReaderState] = useState<ReaderState>(() => {
     const tab = createReaderTab();
 
@@ -150,7 +159,10 @@ export function MarkdownReader() {
 
   const readAloudChunks = useMemo(() => getReadableChunks(blocks), [blocks]);
   const outlineActiveHeadingId = useMemo(() => {
-    if (activeHeadingId && headings.some((heading) => heading.id === activeHeadingId)) {
+    if (
+      activeHeadingId &&
+      headings.some((heading) => heading.id === activeHeadingId)
+    ) {
       return activeHeadingId;
     }
 
@@ -227,16 +239,17 @@ export function MarkdownReader() {
       updateTab(tabId, {
         error: "The clipboard does not contain any markdown text.",
       });
-      return;
+      return false;
     }
 
     const size = new Blob([content]).size;
 
     if (size > MAX_FILE_SIZE) {
       updateTab(tabId, {
-        error: "The pasted markdown is larger than 5 MB. Try a smaller selection.",
+        error:
+          "The pasted markdown is larger than 5 MB. Try a smaller selection.",
       });
-      return;
+      return false;
     }
 
     loadTabContent(tabId, {
@@ -246,23 +259,8 @@ export function MarkdownReader() {
       size,
       source: "paste",
     });
-  }
 
-  async function pasteMarkdownFromClipboard(tabId = activeTab.id) {
-    if (!navigator.clipboard?.readText) {
-      updateTab(tabId, {
-        error: "Clipboard paste is unavailable in this browser.",
-      });
-      return;
-    }
-
-    try {
-      loadMarkdownText(await navigator.clipboard.readText(), tabId);
-    } catch {
-      updateTab(tabId, {
-        error: "Clipboard access was blocked. Try pasting with the keyboard.",
-      });
-    }
+    return true;
   }
 
   function openFilePicker() {
@@ -278,7 +276,10 @@ export function MarkdownReader() {
     event.preventDefault();
     const nextTarget = event.relatedTarget;
 
-    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+    if (
+      nextTarget instanceof Node &&
+      event.currentTarget.contains(nextTarget)
+    ) {
       return;
     }
 
@@ -318,7 +319,9 @@ export function MarkdownReader() {
 
   function closeTab(tabId: string) {
     setReaderState((currentState) => {
-      const closedIndex = currentState.tabs.findIndex((tab) => tab.id === tabId);
+      const closedIndex = currentState.tabs.findIndex(
+        (tab) => tab.id === tabId,
+      );
 
       if (closedIndex === -1) {
         return currentState;
@@ -382,25 +385,40 @@ export function MarkdownReader() {
         value={documentView}
       >
         {/* Browser chrome: tab strip + address-bar toolbar */}
-        <div className="shrink-0 border-b border-border/70 bg-muted/40 backdrop-blur supports-[backdrop-filter]:bg-muted/30">
+        <div className="shrink-0 border-b border-border/70 bg-muted/40 backdrop-blur supports-backdrop-filter:bg-muted/30">
           <ReaderTabs
             activeTabId={readerState.activeTabId}
             onCloseTab={closeTab}
             onNewTab={createNewTab}
-            onPasteMarkdown={() => void pasteMarkdownFromClipboard(activeTab.id)}
             onSelectTab={selectTab}
             tabs={readerState.tabs}
           />
 
           <div className="flex items-center gap-2 px-2.5 py-2 sm:px-3">
-            <div className="hidden items-center gap-1.5 text-muted-foreground sm:flex">
-              <div className="grid size-8 place-items-center rounded-md border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
-                <BookOpen className="size-4" aria-hidden="true" />
-              </div>
+            <div className="hidden items-center mr-1.5 sm:flex">
+              {/* Brand mark: dark-colored variant in light mode, teal in dark mode. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt="Markdown Reader"
+                className="size-6 object-contain dark:hidden"
+                src="/assets/logo-mark-dark.svg"
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt=""
+                aria-hidden="true"
+                className="hidden size-6 object-contain dark:block"
+                src="/assets/logo-mark.svg"
+              />
             </div>
 
             {/* Address bar */}
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border/80 bg-background/90 px-3 py-1.5 shadow-xs ring-1 ring-foreground/5">
+            <div
+              className={cn(
+                "flex min-w-0 items-center gap-2 rounded-full border border-border/80 bg-background/90 px-3 py-1.5 shadow-xs ring-1 ring-foreground/5",
+                file ? "max-w-[16rem] shrink lg:max-w-xs" : "flex-1",
+              )}
+            >
               {file ? (
                 <FileText
                   className="size-4 shrink-0 text-[#03444A] dark:text-[#58D1E2]"
@@ -415,20 +433,27 @@ export function MarkdownReader() {
               <span className="truncate text-sm font-medium">
                 {file?.name ?? "Markdown Reader"}
               </span>
-              <span className="ml-auto hidden shrink-0 truncate text-xs text-muted-foreground md:inline">
-                {file
-                  ? `${stats.words.toLocaleString()} words · ${stats.readingMinutes} min read`
-                  : "Choose, drop, or paste markdown to start"}
-              </span>
               {file ? (
                 <Badge
                   variant="outline"
-                  className="hidden shrink-0 border-[#8EA8AC]/45 text-[#03444A] lg:inline-flex dark:text-[#58D1E2]"
+                  className="hidden shrink-0 border-[#8EA8AC]/45 text-[#03444A] xl:inline-flex dark:text-[#58D1E2]"
                 >
                   Local
                 </Badge>
-              ) : null}
+              ) : (
+                <span className="ml-auto hidden shrink-0 truncate text-xs text-muted-foreground md:inline">
+                  Choose, drop, or paste markdown to start
+                </span>
+              )}
             </div>
+
+            {file ? (
+              <ReadAloudToolbar
+                chunks={readAloudChunks}
+                className="hidden min-w-0 flex-1 sm:flex"
+                key={`${activeTab.id}-${file.name}-${file.lastModified}-${file.size}`}
+              />
+            ) : null}
 
             <TabsList aria-label="Document view" className="shrink-0">
               <TabsTrigger value="preview">
@@ -442,28 +467,6 @@ export function MarkdownReader() {
                 </TabsTrigger>
               ) : null}
             </TabsList>
-
-            {file ? (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      aria-label="Clear current tab"
-                      className="shrink-0"
-                      onClick={resetReader}
-                      size="icon"
-                      type="button"
-                      variant="outline"
-                    />
-                  }
-                >
-                  <X aria-hidden="true" />
-                </TooltipTrigger>
-                <TooltipContent>Close document</TooltipContent>
-              </Tooltip>
-            ) : null}
-
-            <ModeToggle />
           </div>
         </div>
 
@@ -479,15 +482,6 @@ export function MarkdownReader() {
           }
           type="file"
         />
-
-        {file ? (
-          <div className="shrink-0 border-b border-border/70 bg-muted/25 px-2.5 py-2 sm:px-3">
-            <ReadAloudToolbar
-              chunks={readAloudChunks}
-              key={`${activeTab.id}-${file.name}-${file.lastModified}-${file.size}`}
-            />
-          </div>
-        ) : null}
 
         {/* Body: sidebar + content viewport */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -517,7 +511,7 @@ export function MarkdownReader() {
                   </Button>
                   <Button
                     className="justify-center"
-                    onClick={() => void pasteMarkdownFromClipboard(activeTab.id)}
+                    onClick={() => setIsPasteDialogOpen(true)}
                     size="sm"
                     type="button"
                     variant="outline"
@@ -572,9 +566,7 @@ export function MarkdownReader() {
                         onDragOver={(event) => event.preventDefault()}
                         onDrop={handleDrop}
                         onPaste={handlePaste}
-                        onPasteMarkdown={() =>
-                          void pasteMarkdownFromClipboard(activeTab.id)
-                        }
+                        onPasteMarkdown={() => setIsPasteDialogOpen(true)}
                       />
                     </div>
                   )}
@@ -600,7 +592,154 @@ export function MarkdownReader() {
           </section>
         </div>
       </Tabs>
+
+      <PasteMarkdownDialog
+        onImport={(text) => loadMarkdownText(text, activeTab.id)}
+        onOpenChange={setIsPasteDialogOpen}
+        open={isPasteDialogOpen}
+      />
     </main>
+  );
+}
+
+function PasteMarkdownDialog({
+  onImport,
+  onOpenChange,
+  open,
+}: {
+  onImport: (text: string) => boolean;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [value, setValue] = useState("");
+  const [clipboardHint, setClipboardHint] = useState<null | string>(null);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      setValue("");
+      setClipboardHint(null);
+    }
+
+    onOpenChange(nextOpen);
+  }
+
+  const trimmedValue = value.trim();
+  const byteSize = useMemo(() => new Blob([value]).size, [value]);
+  const wordCount = useMemo(
+    () => (trimmedValue ? getDocumentStats(value).words : 0),
+    [trimmedValue, value],
+  );
+  const isTooLarge = byteSize > MAX_FILE_SIZE;
+  const canImport = Boolean(trimmedValue) && !isTooLarge;
+
+  async function pasteFromClipboard() {
+    if (!navigator.clipboard?.readText) {
+      setClipboardHint(
+        "Clipboard access is unavailable — paste with your keyboard.",
+      );
+      return;
+    }
+
+    try {
+      const text = await navigator.clipboard.readText();
+
+      if (!text.trim()) {
+        setClipboardHint("Your clipboard is empty.");
+        return;
+      }
+
+      setValue(text);
+      setClipboardHint(null);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    } catch {
+      setClipboardHint(
+        "Clipboard access was blocked — paste with your keyboard instead.",
+      );
+    }
+  }
+
+  function handleImport() {
+    if (!canImport) {
+      return;
+    }
+
+    if (onImport(value)) {
+      handleOpenChange(false);
+    }
+  }
+
+  return (
+    <Dialog onOpenChange={handleOpenChange} open={open}>
+      <DialogContent
+        className="sm:max-w-xl"
+        onKeyDown={(event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+            event.preventDefault();
+            handleImport();
+          }
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>Paste markdown</DialogTitle>
+          <DialogDescription>
+            Paste or type markdown below. It stays in your browser — nothing is
+            uploaded.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2">
+          <Textarea
+            aria-invalid={isTooLarge}
+            aria-label="Markdown to import"
+            autoFocus
+            className="max-h-[45vh] min-h-44 resize-none font-mono text-xs leading-relaxed"
+            onChange={(event) => setValue(event.currentTarget.value)}
+            placeholder={"# Title\n\nPaste your markdown here…"}
+            ref={textareaRef}
+            spellCheck={false}
+            value={value}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Button
+              onClick={pasteFromClipboard}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <ClipboardPaste aria-hidden="true" />
+              Paste from clipboard
+            </Button>
+            <p className="text-xs tabular-nums text-muted-foreground">
+              {isTooLarge ? (
+                <span className="text-destructive">
+                  {formatBytes(byteSize)} · over the 5 MB limit
+                </span>
+              ) : (
+                `${wordCount.toLocaleString()} ${wordCount === 1 ? "word" : "words"}`
+              )}
+            </p>
+          </div>
+          {clipboardHint ? (
+            <p className="text-xs text-muted-foreground">{clipboardHint}</p>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <p className="mr-auto hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+            <Kbd>⌘</Kbd>
+            <Kbd>Enter</Kbd>
+            to open
+          </p>
+          <DialogClose render={<Button type="button" variant="outline" />}>
+            Cancel
+          </DialogClose>
+          <Button disabled={!canImport} onClick={handleImport} type="button">
+            Open document
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -608,19 +747,17 @@ function ReaderTabs({
   activeTabId,
   onCloseTab,
   onNewTab,
-  onPasteMarkdown,
   onSelectTab,
   tabs,
 }: {
   activeTabId: string;
   onCloseTab: (tabId: string) => void;
   onNewTab: () => void;
-  onPasteMarkdown: () => void;
   onSelectTab: (tabId: string) => void;
   tabs: ReaderTab[];
 }) {
   return (
-    <div className="flex items-end gap-1 px-2 pt-2">
+    <div className="flex items-end gap-1 px-2.5 pt-2 sm:px-3">
       <div
         aria-label="Reader tabs"
         className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto"
@@ -629,7 +766,8 @@ function ReaderTabs({
         {tabs.map((tab, index) => {
           const isActive = tab.id === activeTabId;
           const label = getReaderTabLabel(tab, index);
-          const canClose = tabs.length > 1 || Boolean(tab.file) || Boolean(tab.error);
+          const canClose =
+            tabs.length > 1 || Boolean(tab.file) || Boolean(tab.error);
 
           return (
             <div
@@ -705,23 +843,9 @@ function ReaderTabs({
         </Tooltip>
       </div>
 
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              aria-label="Paste markdown into active tab"
-              className="mb-1 size-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground"
-              onClick={onPasteMarkdown}
-              size="icon-sm"
-              type="button"
-              variant="ghost"
-            />
-          }
-        >
-          <ClipboardPaste aria-hidden="true" />
-        </TooltipTrigger>
-        <TooltipContent>Paste into active tab</TooltipContent>
-      </Tooltip>
+      <div className="mb-0.5 shrink-0">
+        <ModeToggle />
+      </div>
     </div>
   );
 }
@@ -812,30 +936,40 @@ function FileSummary({
   stats: DocumentStats;
 }) {
   return (
-    <div className="rounded-md bg-muted/25 p-3">
-      <div className="flex items-start gap-3">
-        <div className="grid size-9 shrink-0 place-items-center rounded-md bg-background text-[#03444A] ring-1 ring-border dark:text-[#58D1E2]">
+    <div className="rounded-lg border border-border/60 bg-background/60 p-3 shadow-xs">
+      <div className="flex items-start gap-2.5">
+        <div className="grid size-9 shrink-0 place-items-center rounded-md border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
           <FileText className="size-4" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{file.name}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="truncate text-sm font-semibold" title={file.name}>
+            {file.name}
+          </p>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {formatBytes(file.size)} ·{" "}
             {file.source === "paste" ? "pasted" : "edited"}{" "}
             {formatDate(file.lastModified)}
           </p>
         </div>
-        <Button
-          aria-label="Clear current tab"
-          onClick={onReset}
-          size="icon-sm"
-          type="button"
-          variant="ghost"
-        >
-          <X aria-hidden="true" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label="Remove document"
+                className="-mr-1 -mt-1 size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                onClick={onReset}
+                size="icon-sm"
+                type="button"
+                variant="ghost"
+              />
+            }
+          >
+            <X aria-hidden="true" />
+          </TooltipTrigger>
+          <TooltipContent>Remove document</TooltipContent>
+        </Tooltip>
       </div>
-      <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+      <dl className="mt-3 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-border/60 bg-border/60 text-center">
         <Stat label="Words" value={stats.words.toLocaleString()} />
         <Stat label="Lines" value={stats.lines.toLocaleString()} />
         <Stat label="Read" value={`${stats.readingMinutes}m`} />
@@ -844,15 +978,24 @@ function FileSummary({
   );
 }
 
-function ReadAloudToolbar({ chunks }: { chunks: string[] }) {
+function ReadAloudToolbar({
+  chunks,
+  className,
+}: {
+  chunks: string[];
+  className?: string;
+}) {
   const reader = useReadAloud(chunks);
   const hasReadableText = chunks.length > 0;
   const isPlaying = reader.status === "playing";
   const isPaused = reader.status === "paused";
   const canRead = hasReadableText && reader.status !== "unsupported";
   const currentPosition =
-    reader.status === "idle" ? 0 : Math.min(reader.currentIndex + 1, chunks.length);
-  const progress = chunks.length > 0 ? (currentPosition / chunks.length) * 100 : 0;
+    reader.status === "idle"
+      ? 0
+      : Math.min(reader.currentIndex + 1, chunks.length);
+  const progress =
+    chunks.length > 0 ? (currentPosition / chunks.length) * 100 : 0;
   const statusText = getReadAloudStatusText(
     reader.status,
     currentPosition,
@@ -860,112 +1003,116 @@ function ReadAloudToolbar({ chunks }: { chunks: string[] }) {
   );
 
   return (
-    <div className="rounded-md border bg-background/70 p-2.5">
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-        <div className="min-w-0 space-y-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <Volume2 className="size-4 shrink-0 text-[#03444A] dark:text-[#58D1E2]" />
-            <p className="shrink-0 text-sm font-medium">Read aloud</p>
-            <p className="truncate text-xs text-muted-foreground">{statusText}</p>
-          </div>
-          <div
-            aria-label="Reading progress"
-            aria-valuemax={chunks.length}
-            aria-valuemin={0}
-            aria-valuenow={currentPosition}
-            className="h-1.5 overflow-hidden rounded-full bg-muted"
-            role="progressbar"
-          >
-            <div
-              className="h-full rounded-full bg-[#03444A] transition-[width] dark:bg-[#58D1E2]"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
+    <div
+      className={cn(
+        "items-center gap-2 rounded-full border border-border/80 bg-background/70 py-1 pl-2.5 pr-1.5",
+        className,
+      )}
+    >
+      <Volume2 className="size-4 shrink-0 text-[#03444A] dark:text-[#58D1E2]" />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  aria-label={
-                    isPlaying
-                      ? "Pause reading"
-                      : isPaused
-                        ? "Resume reading"
-                        : "Read preview aloud from selection"
-                  }
-                  disabled={!canRead}
-                  onClick={
-                    isPlaying
-                      ? reader.pause
-                      : isPaused
-                        ? reader.resume
-                        : reader.startFromSelection
-                  }
-                  size="icon-sm"
-                  type="button"
-                  variant={isPlaying ? "outline" : "default"}
-                />
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              aria-label={
+                isPlaying
+                  ? "Pause reading"
+                  : isPaused
+                    ? "Resume reading"
+                    : "Read preview aloud from selection"
               }
-            >
-              {isPlaying ? (
-                <Pause aria-hidden="true" />
-              ) : (
-                <Play aria-hidden="true" />
-              )}
-            </TooltipTrigger>
-            <TooltipContent>
-              {isPlaying
-                ? "Pause"
-                : isPaused
-                  ? "Resume"
-                  : "Read from selection"}
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  aria-label="Stop reading"
-                  disabled={!isPlaying && !isPaused}
-                  onClick={reader.stop}
-                  size="icon-sm"
-                  type="button"
-                  variant="outline"
-                />
-              }
-            >
-              <Square aria-hidden="true" />
-            </TooltipTrigger>
-            <TooltipContent>Stop</TooltipContent>
-          </Tooltip>
-
-          <div className="flex min-w-40 flex-1 items-center gap-2 md:w-48 md:flex-none">
-            <label
-              className="shrink-0 text-xs font-medium text-muted-foreground"
-              htmlFor="read-aloud-rate"
-            >
-              Speed
-            </label>
-            <input
-              aria-label="Reading speed"
-              className="h-1.5 min-w-0 flex-1 accent-[#03444A] dark:accent-[#58D1E2]"
+              className="size-7 shrink-0 rounded-full"
               disabled={!canRead}
-              id="read-aloud-rate"
-              max="1.5"
-              min="0.75"
-              onChange={(event) => reader.setRate(Number(event.currentTarget.value))}
-              step="0.05"
-              type="range"
-              value={reader.rate}
+              onClick={
+                isPlaying
+                  ? reader.pause
+                  : isPaused
+                    ? reader.resume
+                    : reader.startFromSelection
+              }
+              size="icon-sm"
+              type="button"
+              variant={isPlaying ? "outline" : "default"}
             />
-            <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">
-              {reader.rate.toFixed(2).replace(/0$/, "")}x
-            </span>
-          </div>
+          }
+        >
+          {isPlaying ? (
+            <Pause aria-hidden="true" />
+          ) : (
+            <Play aria-hidden="true" />
+          )}
+        </TooltipTrigger>
+        <TooltipContent>
+          {isPlaying ? "Pause" : isPaused ? "Resume" : "Read from selection"}
+        </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              aria-label="Stop reading"
+              className="size-7 shrink-0 rounded-full"
+              disabled={!isPlaying && !isPaused}
+              onClick={reader.stop}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            />
+          }
+        >
+          <Square aria-hidden="true" />
+        </TooltipTrigger>
+        <TooltipContent>Stop</TooltipContent>
+      </Tooltip>
+
+      {/* Progress fills the reclaimed space */}
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div
+          aria-label="Reading progress"
+          aria-valuemax={chunks.length}
+          aria-valuemin={0}
+          aria-valuenow={currentPosition}
+          className="h-1.5 min-w-8 flex-1 overflow-hidden rounded-full bg-muted"
+          role="progressbar"
+          title={statusText}
+        >
+          <div
+            className="h-full rounded-full bg-[#03444A] transition-[width] dark:bg-[#58D1E2]"
+            style={{ width: `${progress}%` }}
+          />
         </div>
+        <span className="hidden shrink-0 tabular-nums text-xs text-muted-foreground md:inline">
+          {hasReadableText ? `${currentPosition}/${chunks.length}` : "—"}
+        </span>
+      </div>
+
+      {/* Speed */}
+      <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
+        <label
+          className="text-xs font-medium text-muted-foreground"
+          htmlFor="read-aloud-rate"
+        >
+          Speed
+        </label>
+        <input
+          aria-label="Reading speed"
+          className="h-1.5 w-20 accent-[#03444A] dark:accent-[#58D1E2]"
+          disabled={!canRead}
+          id="read-aloud-rate"
+          max="1.5"
+          min="0.75"
+          onChange={(event) =>
+            reader.setRate(Number(event.currentTarget.value))
+          }
+          step="0.05"
+          type="range"
+          value={reader.rate}
+        />
+        <span className="w-9 text-right tabular-nums text-xs text-muted-foreground">
+          {reader.rate.toFixed(2).replace(/0$/, "")}x
+        </span>
       </div>
     </div>
   );
@@ -977,17 +1124,17 @@ function useReadAloud(chunks: string[]) {
   const chunksRef = useRef(chunks);
   const shouldStopRef = useRef(false);
   const rateRef = useRef(1);
-  const [speechStatus, setSpeechStatus] = useState<Exclude<
-    ReadAloudStatus,
-    "unsupported"
-  >>("idle");
+  const [speechStatus, setSpeechStatus] =
+    useState<Exclude<ReadAloudStatus, "unsupported">>("idle");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [rate, setRateState] = useState(1);
   const speechSupported =
     typeof window !== "undefined" &&
     "speechSynthesis" in window &&
     typeof SpeechSynthesisUtterance !== "undefined";
-  const status: ReadAloudStatus = speechSupported ? speechStatus : "unsupported";
+  const status: ReadAloudStatus = speechSupported
+    ? speechStatus
+    : "unsupported";
 
   useEffect(() => {
     return () => {
@@ -1146,11 +1293,11 @@ function getReadAloudStatusText(
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-border/70 bg-background/70 px-2 py-2">
-      <dt className="text-[0.7rem] font-medium uppercase text-muted-foreground">
+    <div className="bg-background px-2 py-2.5">
+      <dt className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 text-sm font-semibold">{value}</dd>
+      <dd className="mt-0.5 text-sm font-semibold tabular-nums">{value}</dd>
     </div>
   );
 }
@@ -1366,7 +1513,9 @@ function renderBlock(block: MarkdownBlock, index: number) {
       );
     }
     case "paragraph":
-      return <p key={`paragraph-${index}`}>{renderInline(block.text, `${index}`)}</p>;
+      return (
+        <p key={`paragraph-${index}`}>{renderInline(block.text, `${index}`)}</p>
+      );
     case "blockquote":
       return (
         <blockquote key={`quote-${index}`}>
@@ -1531,7 +1680,11 @@ function getSelectedChunkIndex(chunks: string[]) {
 
   const selection = window.getSelection();
 
-  if (!selection || selection.isCollapsed || !selectionWithinReadableRoot(selection)) {
+  if (
+    !selection ||
+    selection.isCollapsed ||
+    !selectionWithinReadableRoot(selection)
+  ) {
     return null;
   }
 
@@ -1548,7 +1701,8 @@ function getSelectedChunkIndex(chunks: string[]) {
   }));
 
   const exactMatch = chunkMatches.find(
-    (chunk) => chunk.text.includes(selectedText) || selectedText.includes(chunk.text),
+    (chunk) =>
+      chunk.text.includes(selectedText) || selectedText.includes(chunk.text),
   );
 
   if (exactMatch) {
@@ -1587,7 +1741,9 @@ function nodeWithinReadableRoot(node: Node | null) {
   }
 
   const element =
-    node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+    node.nodeType === Node.ELEMENT_NODE
+      ? (node as Element)
+      : node.parentElement;
 
   return Boolean(element?.closest("[data-readable-root]"));
 }
@@ -1894,7 +2050,9 @@ function renderInlineToken(token: string, key: string): ReactNode {
     (token.startsWith("__") && token.endsWith("__"))
   ) {
     return (
-      <strong key={key}>{renderInline(token.slice(2, -2), `${key}-strong`)}</strong>
+      <strong key={key}>
+        {renderInline(token.slice(2, -2), `${key}-strong`)}
+      </strong>
     );
   }
 
@@ -1928,7 +2086,8 @@ function sanitizeImageSrc(rawSrc: string) {
     const url = new URL(rawSrc);
     const isRemoteImage = ["http:", "https:"].includes(url.protocol);
     const isInlineImage =
-      url.protocol === "data:" && rawSrc.toLowerCase().startsWith("data:image/");
+      url.protocol === "data:" &&
+      rawSrc.toLowerCase().startsWith("data:image/");
 
     return isRemoteImage || isInlineImage ? rawSrc : null;
   } catch {
@@ -1984,7 +2143,9 @@ function isEditablePasteTarget(target: EventTarget | null) {
 function getPastedDocumentName(content: string) {
   const heading = content.match(/^#{1,6}\s+(.+?)\s*#*\s*$/m)?.[1];
   const baseName = heading
-    ? toPlainSpeechText(heading).replace(/[/:*?"<>|]/g, "").trim()
+    ? toPlainSpeechText(heading)
+        .replace(/[/:*?"<>|]/g, "")
+        .trim()
     : "Pasted markdown";
 
   return `${baseName.slice(0, 48) || "Pasted markdown"}.md`;
