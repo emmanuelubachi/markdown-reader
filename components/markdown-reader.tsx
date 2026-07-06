@@ -13,7 +13,7 @@ import {
   BookOpen,
   Braces,
   FileText,
-  Heading2,
+  ListTree,
   Pause,
   Play,
   RotateCcw,
@@ -105,6 +105,7 @@ export function MarkdownReader() {
   const [file, setFile] = useState<LoadedFile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
 
   const blocks = useMemo(
     () => parseMarkdown(file?.content ?? ""),
@@ -122,6 +123,13 @@ export function MarkdownReader() {
   );
 
   const readAloudChunks = useMemo(() => getReadableChunks(blocks), [blocks]);
+  const outlineActiveHeadingId = useMemo(() => {
+    if (activeHeadingId && headings.some((heading) => heading.id === activeHeadingId)) {
+      return activeHeadingId;
+    }
+
+    return headings[0]?.id ?? null;
+  }, [activeHeadingId, headings]);
 
   async function loadFile(selectedFile: File | undefined) {
     if (!selectedFile) {
@@ -147,12 +155,27 @@ export function MarkdownReader() {
         size: selectedFile.size,
       });
       setError(null);
+      setActiveHeadingId(null);
     } catch {
       setError("The file could not be read. Try exporting it again.");
     }
   }
 
-  function handleDrop(event: DragEvent<HTMLButtonElement>) {
+  function openFilePicker() {
+    inputRef.current?.click();
+  }
+
+  function handleDragEnter(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    setIsDragging(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLElement>) {
     event.preventDefault();
     setIsDragging(false);
     void loadFile(event.dataTransfer.files.item(0) ?? undefined);
@@ -161,15 +184,16 @@ export function MarkdownReader() {
   function resetReader() {
     setFile(null);
     setError(null);
+    setActiveHeadingId(null);
     if (inputRef.current) {
       inputRef.current.value = "";
     }
   }
 
   return (
-    <main className="core-app-shell min-h-screen px-4 py-4 text-foreground sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-7xl flex-col gap-4">
-        <header className="flex flex-wrap items-center justify-between gap-3">
+    <main className="core-app-shell min-h-screen px-4 py-4 text-foreground sm:px-6 lg:h-screen lg:overflow-hidden lg:px-8">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-7xl flex-col gap-4 lg:h-full lg:min-h-0">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
               <BookOpen className="size-5" aria-hidden="true" />
@@ -186,144 +210,149 @@ export function MarkdownReader() {
           <ModeToggle />
         </header>
 
-        <section className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-          <aside className="flex min-h-0 flex-col gap-4">
-            <Card className="rounded-lg" size="sm">
-              <CardHeader>
-                <CardTitle>File</CardTitle>
-                <CardDescription>Nothing is uploaded to a server.</CardDescription>
-                <CardAction>
-                  <Badge
-                    variant="outline"
-                    className="border-[#8EA8AC]/45 text-[#03444A] dark:text-[#58D1E2]"
-                  >
-                    Local
-                  </Badge>
-                </CardAction>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <input
-                  ref={inputRef}
-                  accept={ACCEPTED_FILE_TYPES}
-                  className="sr-only"
-                  onChange={(event) =>
-                    void loadFile(event.currentTarget.files?.item(0) ?? undefined)
-                  }
-                  type="file"
-                />
+        <input
+          ref={inputRef}
+          accept={ACCEPTED_FILE_TYPES}
+          className="sr-only"
+          onChange={(event) =>
+            void loadFile(event.currentTarget.files?.item(0) ?? undefined)
+          }
+          type="file"
+        />
 
-                <button
-                  type="button"
-                  className={cn(
-                    "flex min-h-48 w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-background/70 p-6 text-center transition focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-                    isDragging
-                      ? "border-[#58D1E2] bg-[#58D1E2]/15 text-[#03444A] dark:text-[#58D1E2]"
-                      : "border-border hover:border-[#58D1E2]/60 hover:bg-[#58D1E2]/5",
-                  )}
-                  onClick={() => inputRef.current?.click()}
-                  onDragEnter={(event) => {
-                    event.preventDefault();
-                    setIsDragging(true);
-                  }}
-                  onDragLeave={(event) => {
-                    event.preventDefault();
-                    setIsDragging(false);
-                  }}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={handleDrop}
-                >
-                  <span className="grid size-12 place-items-center rounded-lg border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
-                    <Upload className="size-6" aria-hidden="true" />
-                  </span>
-                  <span className="space-y-1">
-                    <span className="block text-base font-medium">
-                      Drop markdown here
-                    </span>
-                    <span className="block text-sm text-muted-foreground">
-                      or choose a .md file
-                    </span>
-                  </span>
-                </button>
-
-                {error ? (
-                  <Alert variant="destructive">
-                    <AlertCircle aria-hidden="true" />
-                    <AlertTitle>File not loaded</AlertTitle>
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                ) : null}
-
-                {file ? (
-                  <>
-                    <FileSummary
-                      file={file}
-                      onReset={resetReader}
-                      stats={stats}
-                    />
-                    <ReadAloudPanel
-                      chunks={readAloudChunks}
-                      key={`${file.name}-${file.lastModified}-${file.size}`}
-                    />
-                  </>
-                ) : null}
-              </CardContent>
-            </Card>
-
-            <Outline headings={headings} />
-          </aside>
-
-          <section className="flex min-h-[580px] flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs ring-1 ring-foreground/5">
-            <Tabs defaultValue="preview" className="flex min-h-0 flex-1 flex-col">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-5">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {file?.name ?? "No file selected"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {file
-                      ? `${stats.words.toLocaleString()} words`
-                      : "Preview will appear here"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <TabsList aria-label="Document view">
-                    <TabsTrigger value="preview">
-                      <BookOpen aria-hidden="true" />
-                      Preview
-                    </TabsTrigger>
-                    <TabsTrigger value="source">
-                      <Braces aria-hidden="true" />
-                      Source
-                    </TabsTrigger>
-                  </TabsList>
-                  {file ? (
-                    <Button
-                      aria-label="Clear file"
-                      onClick={resetReader}
-                      size="icon"
-                      type="button"
+        <section
+          className={cn(
+            "grid min-h-0 flex-1 gap-4 lg:h-full",
+            file ? "lg:grid-cols-[340px_minmax(0,1fr)]" : "lg:grid-cols-1",
+          )}
+        >
+          {file ? (
+            <aside className="flex min-h-0 flex-col gap-4 lg:h-full">
+              <Card className="rounded-lg" size="sm">
+                <CardHeader>
+                  <CardTitle>File</CardTitle>
+                  <CardDescription>Nothing is uploaded to a server.</CardDescription>
+                  <CardAction>
+                    <Badge
                       variant="outline"
+                      className="border-[#8EA8AC]/45 text-[#03444A] dark:text-[#58D1E2]"
                     >
-                      <X aria-hidden="true" />
-                    </Button>
+                      Local
+                    </Badge>
+                  </CardAction>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {error ? (
+                    <Alert variant="destructive">
+                      <AlertCircle aria-hidden="true" />
+                      <AlertTitle>File not loaded</AlertTitle>
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
                   ) : null}
+
+                  <FileSummary
+                    file={file}
+                    onReset={resetReader}
+                    stats={stats}
+                  />
+                  <Button
+                    className="w-full justify-start"
+                    onClick={openFilePicker}
+                    type="button"
+                    variant="outline"
+                  >
+                    <Upload aria-hidden="true" />
+                    Replace markdown file
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Outline
+                activeHeadingId={outlineActiveHeadingId}
+                headings={headings}
+              />
+            </aside>
+          ) : null}
+
+          <section className="flex min-h-[580px] flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs ring-1 ring-foreground/5 lg:min-h-0">
+            <Tabs defaultValue="preview" className="flex min-h-0 flex-1 flex-col">
+              <div className="border-b px-4 py-3 sm:px-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {file?.name ?? "No file selected"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {file
+                        ? `${stats.words.toLocaleString()} words · ${stats.readingMinutes} min read`
+                        : "Drop a markdown file into the preview area"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <TabsList aria-label="Document view">
+                      <TabsTrigger value="preview">
+                        <BookOpen aria-hidden="true" />
+                        Preview
+                      </TabsTrigger>
+                      <TabsTrigger value="source">
+                        <Braces aria-hidden="true" />
+                        Source
+                      </TabsTrigger>
+                    </TabsList>
+                    {file ? (
+                      <Button
+                        aria-label="Clear file"
+                        onClick={resetReader}
+                        size="icon"
+                        type="button"
+                        variant="outline"
+                      >
+                        <X aria-hidden="true" />
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
+                {file ? (
+                  <ReadAloudToolbar
+                    chunks={readAloudChunks}
+                    key={`${file.name}-${file.lastModified}-${file.size}`}
+                  />
+                ) : null}
               </div>
 
-              <TabsContent value="preview" className="min-h-0">
-                <ScrollArea className="h-[calc(100vh-12rem)] min-h-[500px]">
+              <TabsContent value="preview" className="min-h-0 overflow-hidden">
+                <ScrollArea className="h-[calc(100vh-12rem)] min-h-[500px] lg:h-full lg:min-h-0">
                   <div className="mx-auto w-full max-w-3xl px-5 py-8 sm:px-8 lg:px-10">
                     {file ? (
-                      <MarkdownPreview blocks={blocks} />
+                      <MarkdownPreview
+                        blocks={blocks}
+                        onActiveHeadingChange={setActiveHeadingId}
+                      />
                     ) : (
-                      <EmptyPreview />
+                      <div className="space-y-4">
+                        {error ? (
+                          <Alert variant="destructive">
+                            <AlertCircle aria-hidden="true" />
+                            <AlertTitle>File not loaded</AlertTitle>
+                            <AlertDescription>{error}</AlertDescription>
+                          </Alert>
+                        ) : null}
+                        <EmptyPreview
+                          isDragging={isDragging}
+                          onClick={openFilePicker}
+                          onDragEnter={handleDragEnter}
+                          onDragLeave={handleDragLeave}
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={handleDrop}
+                        />
+                      </div>
                     )}
                   </div>
                 </ScrollArea>
               </TabsContent>
 
-              <TabsContent value="source" className="min-h-0">
-                <ScrollArea className="h-[calc(100vh-12rem)] min-h-[500px]">
+              <TabsContent value="source" className="min-h-0 overflow-hidden">
+                <ScrollArea className="h-[calc(100vh-12rem)] min-h-[500px] lg:h-full lg:min-h-0">
                   <pre
                     className="min-h-full overflow-x-auto bg-muted/30 p-5 font-mono text-xs leading-relaxed text-foreground sm:p-8"
                     data-readable-root="source"
@@ -340,6 +369,56 @@ export function MarkdownReader() {
   );
 }
 
+function UploadDropZone({
+  isDragging,
+  label,
+  onClick,
+  onDragEnter,
+  onDragLeave,
+  onDragOver,
+  onDrop,
+  supportingText,
+}: {
+  isDragging: boolean;
+  label: string;
+  onClick: () => void;
+  onDragEnter: (event: DragEvent<HTMLElement>) => void;
+  onDragLeave: (event: DragEvent<HTMLElement>) => void;
+  onDragOver: (event: DragEvent<HTMLElement>) => void;
+  onDrop: (event: DragEvent<HTMLElement>) => void;
+  supportingText: string;
+}) {
+  return (
+    <button
+      className={cn(
+        "flex w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-background/70 text-center transition focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+        "min-h-[420px] p-8",
+        isDragging
+          ? "border-[#58D1E2] bg-[#58D1E2]/12 text-[#03444A] dark:text-[#58D1E2]"
+          : "border-border hover:border-[#58D1E2]/55 hover:bg-muted/35",
+      )}
+      onClick={onClick}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      type="button"
+    >
+      <span
+        className="grid size-14 place-items-center rounded-lg border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]"
+      >
+        <Upload className="size-7" aria-hidden="true" />
+      </span>
+      <span className="space-y-1">
+        <span className="block text-lg font-medium">{label}</span>
+        <span className="block text-sm text-muted-foreground">
+          {supportingText}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function FileSummary({
   file,
   onReset,
@@ -350,7 +429,7 @@ function FileSummary({
   stats: DocumentStats;
 }) {
   return (
-    <div className="rounded-lg border bg-muted/30 p-3">
+    <div className="rounded-md bg-muted/25 p-3">
       <div className="flex items-start gap-3">
         <div className="grid size-9 shrink-0 place-items-center rounded-md bg-background text-[#03444A] ring-1 ring-border dark:text-[#58D1E2]">
           <FileText className="size-4" aria-hidden="true" />
@@ -380,7 +459,7 @@ function FileSummary({
   );
 }
 
-function ReadAloudPanel({ chunks }: { chunks: string[] }) {
+function ReadAloudToolbar({ chunks }: { chunks: string[] }) {
   const reader = useReadAloud(chunks);
   const hasReadableText = chunks.length > 0;
   const isPlaying = reader.status === "playing";
@@ -396,17 +475,30 @@ function ReadAloudPanel({ chunks }: { chunks: string[] }) {
   );
 
   return (
-    <div className="rounded-lg border bg-background/70 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Volume2 className="size-4 text-[#03444A] dark:text-[#58D1E2]" />
-            <p className="text-sm font-medium">Read aloud</p>
+    <div className="mt-3 rounded-md border bg-background/70 p-2.5">
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+        <div className="min-w-0 space-y-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Volume2 className="size-4 shrink-0 text-[#03444A] dark:text-[#58D1E2]" />
+            <p className="shrink-0 text-sm font-medium">Read aloud</p>
+            <p className="truncate text-xs text-muted-foreground">{statusText}</p>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">{statusText}</p>
+          <div
+            aria-label="Reading progress"
+            aria-valuemax={chunks.length}
+            aria-valuemin={0}
+            aria-valuenow={currentPosition}
+            className="h-1.5 overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+          >
+            <div
+              className="h-full rounded-full bg-[#03444A] transition-[width] dark:bg-[#58D1E2]"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex flex-wrap items-center gap-2">
           <Tooltip>
             <TooltipTrigger
               render={
@@ -438,7 +530,7 @@ function ReadAloudPanel({ chunks }: { chunks: string[] }) {
                 <Play aria-hidden="true" />
               )}
             </TooltipTrigger>
-          <TooltipContent>
+            <TooltipContent>
               {isPlaying
                 ? "Pause"
                 : isPaused
@@ -464,45 +556,31 @@ function ReadAloudPanel({ chunks }: { chunks: string[] }) {
             </TooltipTrigger>
             <TooltipContent>Stop</TooltipContent>
           </Tooltip>
+
+          <div className="flex min-w-40 flex-1 items-center gap-2 md:w-48 md:flex-none">
+            <label
+              className="shrink-0 text-xs font-medium text-muted-foreground"
+              htmlFor="read-aloud-rate"
+            >
+              Speed
+            </label>
+            <input
+              aria-label="Reading speed"
+              className="h-1.5 min-w-0 flex-1 accent-[#03444A] dark:accent-[#58D1E2]"
+              disabled={!canRead}
+              id="read-aloud-rate"
+              max="1.5"
+              min="0.75"
+              onChange={(event) => reader.setRate(Number(event.currentTarget.value))}
+              step="0.05"
+              type="range"
+              value={reader.rate}
+            />
+            <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">
+              {reader.rate.toFixed(2).replace(/0$/, "")}x
+            </span>
+          </div>
         </div>
-      </div>
-
-      <div
-        aria-label="Reading progress"
-        aria-valuemax={chunks.length}
-        aria-valuemin={0}
-        aria-valuenow={currentPosition}
-        className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"
-        role="progressbar"
-      >
-        <div
-          className="h-full rounded-full bg-[#03444A] transition-[width] dark:bg-[#58D1E2]"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-
-      <div className="mt-3 flex items-center gap-3">
-        <label
-          className="shrink-0 text-xs font-medium text-muted-foreground"
-          htmlFor="read-aloud-rate"
-        >
-          Speed
-        </label>
-        <input
-          aria-label="Reading speed"
-          className="h-1.5 min-w-0 flex-1 accent-[#03444A] dark:accent-[#58D1E2]"
-          disabled={!canRead}
-          id="read-aloud-rate"
-          max="1.5"
-          min="0.75"
-          onChange={(event) => reader.setRate(Number(event.currentTarget.value))}
-          step="0.05"
-          type="range"
-          value={reader.rate}
-        />
-        <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">
-          {reader.rate.toFixed(2).replace(/0$/, "")}x
-        </span>
       </div>
     </div>
   );
@@ -683,7 +761,7 @@ function getReadAloudStatusText(
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-background px-2 py-2 ring-1 ring-border">
+    <div className="rounded-md border border-border/70 bg-background/70 px-2 py-2">
       <dt className="text-[0.7rem] font-medium uppercase text-muted-foreground">
         {label}
       </dt>
@@ -692,25 +770,43 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Outline({ headings }: { headings: Extract<MarkdownBlock, { type: "heading" }>[] }) {
+function Outline({
+  activeHeadingId,
+  headings,
+}: {
+  activeHeadingId: null | string;
+  headings: Extract<MarkdownBlock, { type: "heading" }>[];
+}) {
   return (
-    <div className="rounded-lg border bg-card p-4 text-card-foreground shadow-xs ring-1 ring-foreground/5">
+    <div className="flex min-h-0 flex-1 flex-col rounded-lg border bg-card p-4 text-card-foreground shadow-xs ring-1 ring-foreground/5">
       <div className="flex items-center gap-2">
-        <Heading2 className="size-4 text-[#03444A] dark:text-[#58D1E2]" />
+        <ListTree className="size-4 text-[#03444A] dark:text-[#58D1E2]" />
         <h2 className="text-sm font-medium">Outline</h2>
       </div>
       {headings.length > 0 ? (
-        <nav className="mt-3 max-h-72 space-y-1 overflow-auto pr-1">
-          {headings.slice(0, 24).map((heading) => (
-            <a
-              className="block truncate rounded-md px-2 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              href={`#${heading.id}`}
-              key={heading.id}
-              style={{ paddingLeft: `${(heading.level - 1) * 0.75 + 0.5}rem` }}
-            >
-              {heading.text}
-            </a>
-          ))}
+        <nav className="mt-3 min-h-0 flex-1 space-y-1 overflow-auto pr-1">
+          {headings.slice(0, 36).map((heading) => {
+            const isActive = heading.id === activeHeadingId;
+
+            return (
+              <a
+                aria-current={isActive ? "location" : undefined}
+                className={cn(
+                  "block truncate rounded-md px-2 py-1.5 text-sm transition hover:bg-muted hover:text-foreground",
+                  isActive
+                    ? "bg-[#58D1E2]/12 text-foreground ring-1 ring-[#58D1E2]/25"
+                    : "text-muted-foreground",
+                )}
+                href={`#${heading.id}`}
+                key={heading.id}
+                style={{
+                  paddingLeft: `${(heading.level - 1) * 0.75 + 0.5}rem`,
+                }}
+              >
+                {heading.text}
+              </a>
+            );
+          })}
         </nav>
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">
@@ -721,21 +817,92 @@ function Outline({ headings }: { headings: Extract<MarkdownBlock, { type: "headi
   );
 }
 
-function EmptyPreview() {
+function EmptyPreview({
+  isDragging,
+  onClick,
+  onDragEnter,
+  onDragLeave,
+  onDragOver,
+  onDrop,
+}: {
+  isDragging: boolean;
+  onClick: () => void;
+  onDragEnter: (event: DragEvent<HTMLElement>) => void;
+  onDragLeave: (event: DragEvent<HTMLElement>) => void;
+  onDragOver: (event: DragEvent<HTMLElement>) => void;
+  onDrop: (event: DragEvent<HTMLElement>) => void;
+}) {
   return (
-    <div className="flex min-h-[420px] flex-col items-center justify-center rounded-lg border border-dashed bg-background/60 p-8 text-center">
-      <div className="grid size-14 place-items-center rounded-lg border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
-        <FileText className="size-7" aria-hidden="true" />
-      </div>
-      <h2 className="mt-4 text-lg font-semibold">No markdown loaded</h2>
-      <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-        Choose a file from the panel to start reading.
-      </p>
-    </div>
+    <UploadDropZone
+      isDragging={isDragging}
+      label="Drop markdown here"
+      onClick={onClick}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      supportingText="or choose a local .md file"
+    />
   );
 }
 
-function MarkdownPreview({ blocks }: { blocks: MarkdownBlock[] }) {
+function MarkdownPreview({
+  blocks,
+  onActiveHeadingChange,
+}: {
+  blocks: MarkdownBlock[];
+  onActiveHeadingChange: (headingId: string) => void;
+}) {
+  const articleRef = useRef<HTMLElement>(null);
+  const headingSignature = useMemo(
+    () =>
+      blocks
+        .filter((block) => block.type === "heading")
+        .map((heading) => heading.id)
+        .join("\n"),
+    [blocks],
+  );
+
+  useEffect(() => {
+    const article = articleRef.current;
+
+    if (!article || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const headingElements = Array.from(
+      article.querySelectorAll<HTMLElement>("[data-markdown-heading]"),
+    );
+
+    if (headingElements.length === 0) {
+      return;
+    }
+
+    const scrollRoot = article.closest("[data-slot='scroll-area-viewport']");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleHeading = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort(
+            (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
+          )[0];
+
+        if (visibleHeading?.target.id) {
+          onActiveHeadingChange(visibleHeading.target.id);
+        }
+      },
+      {
+        root: scrollRoot,
+        rootMargin: "-12% 0px -72% 0px",
+        threshold: [0, 1],
+      },
+    );
+
+    headingElements.forEach((heading) => observer.observe(heading));
+
+    return () => observer.disconnect();
+  }, [headingSignature, onActiveHeadingChange]);
+
   if (blocks.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -745,7 +912,11 @@ function MarkdownPreview({ blocks }: { blocks: MarkdownBlock[] }) {
   }
 
   return (
-    <article className="markdown-preview" data-readable-root="preview">
+    <article
+      className="markdown-preview"
+      data-readable-root="preview"
+      ref={articleRef}
+    >
       {blocks.map((block, index) => renderBlock(block, index))}
     </article>
   );
@@ -759,7 +930,7 @@ function renderBlock(block: MarkdownBlock, index: number) {
 
       if (block.level === 1) {
         return (
-          <h1 id={block.id} key={key}>
+          <h1 data-markdown-heading id={block.id} key={key}>
             {children}
           </h1>
         );
@@ -767,7 +938,7 @@ function renderBlock(block: MarkdownBlock, index: number) {
 
       if (block.level === 2) {
         return (
-          <h2 id={block.id} key={key}>
+          <h2 data-markdown-heading id={block.id} key={key}>
             {children}
           </h2>
         );
@@ -775,7 +946,7 @@ function renderBlock(block: MarkdownBlock, index: number) {
 
       if (block.level === 3) {
         return (
-          <h3 id={block.id} key={key}>
+          <h3 data-markdown-heading id={block.id} key={key}>
             {children}
           </h3>
         );
@@ -783,7 +954,7 @@ function renderBlock(block: MarkdownBlock, index: number) {
 
       if (block.level === 4) {
         return (
-          <h4 id={block.id} key={key}>
+          <h4 data-markdown-heading id={block.id} key={key}>
             {children}
           </h4>
         );
@@ -791,14 +962,14 @@ function renderBlock(block: MarkdownBlock, index: number) {
 
       if (block.level === 5) {
         return (
-          <h5 id={block.id} key={key}>
+          <h5 data-markdown-heading id={block.id} key={key}>
             {children}
           </h5>
         );
       }
 
       return (
-        <h6 id={block.id} key={key}>
+        <h6 data-markdown-heading id={block.id} key={key}>
           {children}
         </h6>
       );
