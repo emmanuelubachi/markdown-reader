@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Markdown Reader
+
+A fast, **local-first** markdown reader with a browser-style, full-width interface. Open, drop, or paste markdown and read it in a clean, distraction-free preview — files never leave your browser, nothing is uploaded.
+
+<p>
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white" />
+  <img alt="React" src="https://img.shields.io/badge/React-19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
+  <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" />
+  <img alt="shadcn/ui" src="https://img.shields.io/badge/shadcn/ui-000000?style=for-the-badge&logo=shadcnui&logoColor=white" />
+  <img alt="Base UI" src="https://img.shields.io/badge/Base_UI-1A1A1A?style=for-the-badge" />
+  <img alt="Turbopack" src="https://img.shields.io/badge/Turbopack-EF4444?style=for-the-badge&logo=turbopack&logoColor=white" />
+  <img alt="pnpm" src="https://img.shields.io/badge/pnpm-F69220?style=for-the-badge&logo=pnpm&logoColor=white" />
+</p>
+
+## Features
+
+- 🗂️ **Tabbed documents** — open multiple markdown files at once, browser-style.
+- 📥 **Multiple inputs** — choose a file, drag & drop anywhere, or paste markdown (dialog or ⌘/Ctrl + V).
+- 👀 **Preview & Source** — toggle between the rendered view and the raw markdown.
+- 🧭 **Outline navigation** — auto-generated heading outline with active-heading tracking as you scroll.
+- 🔊 **Read aloud** — text-to-speech playback with play/pause, stop, and adjustable speed.
+- 📊 **Document stats** — live word count, line count, and estimated reading time.
+- 🌗 **Light & dark themes** — system-aware with a manual toggle.
+- 🔒 **Fully local** — parsing and rendering happen in the browser; nothing is sent to a server.
+
+The markdown is rendered by a lightweight, dependency-free parser supporting headings, lists, tables, blockquotes, fenced code, horizontal rules, links, images, and inline formatting (bold, italic, inline code), with URL/image sanitization built in.
+
+## Tech Stack
+
+| Area       | Technology                                                        |
+| ---------- | ----------------------------------------------------------------- |
+| Framework  | [Next.js 16](https://nextjs.org) (App Router, Turbopack)          |
+| UI runtime | [React 19](https://react.dev)                                     |
+| Language   | [TypeScript 5](https://www.typescriptlang.org)                    |
+| Styling    | [Tailwind CSS 4](https://tailwindcss.com)                         |
+| Components | [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com) |
+| Icons      | [lucide-react](https://lucide.dev)                                |
+| Theming    | [next-themes](https://github.com/pacocoursey/next-themes)         |
+| Package    | [pnpm](https://pnpm.io)                                           |
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies and start the dev server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command      | Description                          |
+| ------------ | ----------------------------------- |
+| `pnpm dev`   | Start the development server        |
+| `pnpm build` | Create a production build           |
+| `pnpm start` | Run the production build            |
+| `pnpm lint`  | Lint the project with ESLint        |
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+app/                          # Next.js App Router entry (layout, page, metadata)
+components/
+  markdown-reader/            # Feature UI, split by concern
+    markdown-reader.tsx       # Container: state, tabs, layout
+    reader-tabs.tsx           # Browser-style tab strip
+    read-aloud-toolbar.tsx    # Text-to-speech controls
+    paste-dialog.tsx          # Paste-markdown dialog
+    markdown-preview.tsx      # Rendered markdown output
+    outline.tsx               # Heading outline
+    file-summary.tsx          # File info + stats
+    upload-drop-zone.tsx      # Empty-state / drop target
+  ui/                         # shadcn/ui primitives
+hooks/
+  use-read-aloud.ts           # Speech-synthesis hook
+lib/
+  markdown/                   # Framework-free logic
+    parse.ts                  # Markdown parser
+    render helpers, speech, stats, sanitize, document, types
+public/assets/                # Brand logo variants (light/dark)
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Private / internal project.
