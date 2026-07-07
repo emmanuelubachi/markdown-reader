@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -50,6 +52,13 @@ import {
 } from "@/lib/markdown/document";
 import { parseMarkdown } from "@/lib/markdown/parse";
 import {
+  clearReaderSession as clearReaderSessionStorage,
+  isReaderPersistenceAvailable,
+  loadReaderSession,
+  rememberActiveReaderTabId,
+  saveReaderSession,
+} from "@/lib/markdown/persistence";
+import {
   getReadableChunks,
   rememberReadableSelection,
 } from "@/lib/markdown/speech";
@@ -72,10 +81,28 @@ type ReaderTabModel = {
   stats: DocumentStats;
 };
 
+type PersistenceStatus =
+  | "error"
+  | "restoring"
+  | "saved"
+  | "saving"
+  | "unavailable";
+
+const SAVE_INDICATOR_TIMEOUT_MS = 2500;
+
 export function MarkdownReader() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const didChangeBeforeRestoreRef = useRef(false);
+  const persistenceAvailableRef = useRef(false);
+  const readerStateRef = useRef<ReaderState | null>(null);
+  const lastPersistedSignatureRef = useRef<null | string>(null);
+  const saveIndicatorTimeoutRef = useRef<null | number>(null);
+  const saveSequenceRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
+  const [isPersistenceReady, setIsPersistenceReady] = useState(false);
+  const [persistenceStatus, setPersistenceStatus] =
+    useState<PersistenceStatus>("restoring");
   const [readerState, setReaderState] = useState<ReaderState>(() => {
     const tab = createReaderTab();
 
@@ -84,6 +111,7 @@ export function MarkdownReader() {
       tabs: [tab],
     };
   });
+
   const activeTab = useMemo(
     () =>
       readerState.tabs.find((tab) => tab.id === readerState.activeTabId) ??
@@ -92,6 +120,7 @@ export function MarkdownReader() {
   );
   const file = activeTab.file;
   const documentView = activeTab.view;
+  const canUseSplitView = readerState.tabs.length >= 2;
   const [splitTabId, setSplitTabId] = useState<null | string>(null);
   const splitTab = useMemo(() => {
     if (!splitTabId) {
@@ -108,34 +137,260 @@ export function MarkdownReader() {
   }, [activeTab.id, readerState.tabs, splitTabId]);
   const activeModel = useReaderTabModel(activeTab);
 
-  function updateTab(tabId: string, updates: Partial<ReaderTab>) {
-    setReaderState((currentState) => {
-      if (!currentState.tabs.some((tab) => tab.id === tabId)) {
-        return currentState;
+  const clearSaveIndicatorTimeout = useCallback(() => {
+    if (saveIndicatorTimeoutRef.current === null) {
+      return;
+    }
+
+    window.clearTimeout(saveIndicatorTimeoutRef.current);
+    saveIndicatorTimeoutRef.current = null;
+  }, []);
+
+  const showSavingIndicator = useCallback(
+    (saveSequence: number) => {
+      clearSaveIndicatorTimeout();
+      setPersistenceStatus("saving");
+
+      saveIndicatorTimeoutRef.current = window.setTimeout(() => {
+        if (saveSequenceRef.current === saveSequence) {
+          setPersistenceStatus("saved");
+        }
+      }, SAVE_INDICATOR_TIMEOUT_MS);
+    },
+    [clearSaveIndicatorTimeout],
+  );
+
+  useEffect(() => {
+    readerStateRef.current = readerState;
+  }, [readerState]);
+
+  useEffect(() => () => clearSaveIndicatorTimeout(), [
+    clearSaveIndicatorTimeout,
+  ]);
+
+  // Persist-worthy fingerprint of the session. Excludes transient UI state
+  // (e.g. the scroll-driven active heading) so scrolling never triggers a save.
+  const persistenceSignature = useMemo(
+    () => getReaderPersistenceSignature(readerState),
+    [readerState],
+  );
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    if (!isReaderPersistenceAvailable()) {
+      persistenceAvailableRef.current = false;
+      const unavailableStatusId = window.setTimeout(() => {
+        if (!isCancelled) {
+          setPersistenceStatus("unavailable");
+          setIsPersistenceReady(true);
+        }
+      }, 0);
+
+      return () => window.clearTimeout(unavailableStatusId);
+    }
+
+    persistenceAvailableRef.current = true;
+    void loadReaderSession()
+      .then((session) => {
+        if (isCancelled) {
+          return;
+        }
+
+        if (session && !didChangeBeforeRestoreRef.current) {
+          readerStateRef.current = session.state;
+          lastPersistedSignatureRef.current = getReaderPersistenceSignature(
+            session.state,
+          );
+          setReaderState(session.state);
+          setPersistenceStatus("saved");
+        } else {
+          setPersistenceStatus("saving");
+        }
+
+        setIsPersistenceReady(true);
+      })
+      .catch(() => {
+        if (isCancelled) {
+          return;
+        }
+
+        setPersistenceStatus("error");
+        setIsPersistenceReady(true);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isPersistenceReady || !persistenceAvailableRef.current) {
+      return;
+    }
+
+    // Already persisted this exact state (e.g. via an immediate save on a
+    // structural change) — no debounced write needed.
+    if (persistenceSignature === lastPersistedSignatureRef.current) {
+      return;
+    }
+
+    const saveSequence = saveSequenceRef.current + 1;
+
+    saveSequenceRef.current = saveSequence;
+    const statusTimeoutId = window.setTimeout(
+      () => showSavingIndicator(saveSequence),
+      0,
+    );
+
+    const timeoutId = window.setTimeout(() => {
+      const stateToSave = readerStateRef.current;
+
+      if (!stateToSave) {
+        return;
       }
 
-      return {
+      void saveReaderSession(stateToSave)
+        .then((savedAt) => {
+          if (saveSequenceRef.current !== saveSequence) {
+            return;
+          }
+
+          if (savedAt) {
+            lastPersistedSignatureRef.current = persistenceSignature;
+            clearSaveIndicatorTimeout();
+            setPersistenceStatus("saved");
+          } else {
+            clearSaveIndicatorTimeout();
+            setPersistenceStatus("unavailable");
+          }
+        })
+        .catch(() => {
+          if (saveSequenceRef.current === saveSequence) {
+            clearSaveIndicatorTimeout();
+            setPersistenceStatus("error");
+          }
+        });
+    }, 450);
+
+    return () => {
+      window.clearTimeout(statusTimeoutId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    clearSaveIndicatorTimeout,
+    isPersistenceReady,
+    persistenceSignature,
+    showSavingIndicator,
+  ]);
+
+  function markReaderStateChanged() {
+    didChangeBeforeRestoreRef.current = true;
+  }
+
+  function getCurrentReaderState() {
+    return readerStateRef.current ?? readerState;
+  }
+
+  function persistReaderStateImmediately(nextState: ReaderState) {
+    rememberActiveReaderTabId(nextState.activeTabId);
+
+    if (!persistenceAvailableRef.current) {
+      return;
+    }
+
+    // Mark this state as persisted up front so the debounced autosave effect
+    // (which re-runs on the same signature change) skips a redundant write.
+    const signature = getReaderPersistenceSignature(nextState);
+
+    lastPersistedSignatureRef.current = signature;
+
+    const saveSequence = saveSequenceRef.current + 1;
+
+    saveSequenceRef.current = saveSequence;
+    showSavingIndicator(saveSequence);
+
+    void saveReaderSession(nextState)
+      .then((savedAt) => {
+        if (saveSequenceRef.current !== saveSequence) {
+          return;
+        }
+
+        if (savedAt) {
+          clearSaveIndicatorTimeout();
+          setPersistenceStatus("saved");
+        } else {
+          clearSaveIndicatorTimeout();
+          setPersistenceStatus("unavailable");
+        }
+      })
+      .catch(() => {
+        // Let the debounced autosave retry this state on the next change.
+        if (lastPersistedSignatureRef.current === signature) {
+          lastPersistedSignatureRef.current = null;
+        }
+
+        if (saveSequenceRef.current === saveSequence) {
+          clearSaveIndicatorTimeout();
+          setPersistenceStatus("error");
+        }
+      });
+  }
+
+  function commitReaderState(
+    nextState: ReaderState,
+    options: { persistImmediately?: boolean } = {},
+  ) {
+    markReaderStateChanged();
+    readerStateRef.current = nextState;
+    setReaderState(nextState);
+    rememberActiveReaderTabId(nextState.activeTabId);
+
+    if (options.persistImmediately) {
+      persistReaderStateImmediately(nextState);
+    }
+  }
+
+  function updateTab(
+    tabId: string,
+    updates: Partial<ReaderTab>,
+    options: { persistImmediately?: boolean } = {},
+  ) {
+    const currentState = getCurrentReaderState();
+
+    if (!currentState.tabs.some((tab) => tab.id === tabId)) {
+      return;
+    }
+
+    commitReaderState(
+      {
         ...currentState,
         tabs: currentState.tabs.map((tab) =>
           tab.id === tabId ? { ...tab, ...updates } : tab,
         ),
-      };
-    });
+      },
+      options,
+    );
   }
 
   function loadTabContent(tabId: string, nextFile: LoadedFile) {
-    updateTab(tabId, {
-      activeHeadingId: null,
-      error: null,
-      file: nextFile,
-      view: "preview",
-    });
+    updateTab(
+      tabId,
+      {
+        activeHeadingId: null,
+        error: null,
+        file: nextFile,
+        view: "preview",
+      },
+      { persistImmediately: true },
+    );
   }
 
   function editTabContent(tabId: string, content: string) {
     const size = new Blob([content]).size;
+    const currentState = getCurrentReaderState();
 
-    setReaderState((currentState) => ({
+    commitReaderState({
       ...currentState,
       tabs: currentState.tabs.map((tab) => {
         if (tab.id !== tabId || !tab.file) {
@@ -154,7 +409,7 @@ export function MarkdownReader() {
           },
         };
       }),
-    }));
+    });
   }
 
   async function loadFile(
@@ -257,21 +512,56 @@ export function MarkdownReader() {
   }
 
   function resetReader() {
-    updateTab(activeTab.id, {
-      activeHeadingId: null,
-      error: null,
-      file: null,
-      view: "preview",
-    });
+    updateTab(
+      activeTab.id,
+      {
+        activeHeadingId: null,
+        error: null,
+        file: null,
+        view: "preview",
+      },
+      { persistImmediately: true },
+    );
   }
 
   function createNewTab() {
+    const currentState = getCurrentReaderState();
     const nextTab = createReaderTab();
 
-    setReaderState((currentState) => ({
-      activeTabId: nextTab.id,
-      tabs: [...currentState.tabs, nextTab],
-    }));
+    commitReaderState(
+      {
+        activeTabId: nextTab.id,
+        tabs: [...currentState.tabs, nextTab],
+      },
+      { persistImmediately: true },
+    );
+  }
+
+  async function handleClearReaderSession() {
+    setSplitTabId(null);
+
+    const freshTab = createReaderTab();
+    const nextState: ReaderState = {
+      activeTabId: freshTab.id,
+      tabs: [freshTab],
+    };
+
+    // Reset in memory and mark the blank session as already persisted so the
+    // autosave effect doesn't immediately re-write it after we wipe storage.
+    didChangeBeforeRestoreRef.current = true;
+    readerStateRef.current = nextState;
+    lastPersistedSignatureRef.current = getReaderPersistenceSignature(nextState);
+    setReaderState(nextState);
+    rememberActiveReaderTabId(nextState.activeTabId);
+
+    try {
+      await clearReaderSessionStorage();
+      setPersistenceStatus(
+        persistenceAvailableRef.current ? "saved" : "unavailable",
+      );
+    } catch {
+      setPersistenceStatus("error");
+    }
   }
 
   function toggleSplitView() {
@@ -286,10 +576,19 @@ export function MarkdownReader() {
   }
 
   function selectTab(tabId: string) {
-    setReaderState((currentState) => ({
-      ...currentState,
-      activeTabId: tabId,
-    }));
+    const currentState = getCurrentReaderState();
+
+    if (!currentState.tabs.some((tab) => tab.id === tabId)) {
+      return;
+    }
+
+    commitReaderState(
+      {
+        ...currentState,
+        activeTabId: tabId,
+      },
+      { persistImmediately: true },
+    );
   }
 
   function closeTab(tabId: string) {
@@ -297,41 +596,45 @@ export function MarkdownReader() {
       currentSplitTabId === tabId ? null : currentSplitTabId,
     );
 
-    setReaderState((currentState) => {
-      const closedIndex = currentState.tabs.findIndex(
-        (tab) => tab.id === tabId,
-      );
+    const currentState = getCurrentReaderState();
+    const closedIndex = currentState.tabs.findIndex((tab) => tab.id === tabId);
 
-      if (closedIndex === -1) {
-        return currentState;
-      }
+    if (closedIndex === -1) {
+      return;
+    }
 
-      const nextTabs = currentState.tabs.filter((tab) => tab.id !== tabId);
+    const nextTabs = currentState.tabs.filter((tab) => tab.id !== tabId);
 
-      if (nextTabs.length === 0) {
-        const nextTab = createReaderTab();
+    if (nextTabs.length === 0) {
+      const nextTab = createReaderTab();
 
-        return {
+      commitReaderState(
+        {
           activeTabId: nextTab.id,
           tabs: [nextTab],
-        };
-      }
-
-      const activeTabStillExists = nextTabs.some(
-        (tab) => tab.id === currentState.activeTabId,
+        },
+        { persistImmediately: true },
       );
-      const fallbackTab =
-        nextTabs[Math.min(Math.max(closedIndex, 0), nextTabs.length - 1)] ??
-        nextTabs[0]!;
+      return;
+    }
 
-      return {
+    const activeTabStillExists = nextTabs.some(
+      (tab) => tab.id === currentState.activeTabId,
+    );
+    const fallbackTab =
+      nextTabs[Math.min(Math.max(closedIndex, 0), nextTabs.length - 1)] ??
+      nextTabs[0]!;
+
+    commitReaderState(
+      {
         activeTabId:
           tabId === currentState.activeTabId || !activeTabStillExists
             ? fallbackTab.id
             : currentState.activeTabId,
         tabs: nextTabs,
-      };
-    });
+      },
+      { persistImmediately: true },
+    );
   }
 
   function handlePaste(event: ClipboardEvent<HTMLElement>) {
@@ -367,9 +670,11 @@ export function MarkdownReader() {
         <div className="shrink-0 border-b border-border/70 bg-muted/40 backdrop-blur supports-backdrop-filter:bg-muted/30">
           <ReaderTabs
             activeTabId={readerState.activeTabId}
+            onClearSession={handleClearReaderSession}
             onCloseTab={closeTab}
             onNewTab={createNewTab}
             onSelectTab={selectTab}
+            persistenceStatus={persistenceStatus}
             tabs={readerState.tabs}
           />
 
@@ -434,22 +739,25 @@ export function MarkdownReader() {
               />
             ) : null}
 
-            <Button
-              aria-label={splitTab ? "Close split view" : "Open split view"}
-              aria-pressed={Boolean(splitTab)}
-              className="hidden shrink-0 lg:inline-flex"
-              disabled={readerState.tabs.length < 2}
-              onClick={toggleSplitView}
-              size="icon"
-              type="button"
-              variant={splitTab ? "secondary" : "outline"}
-            >
-              {splitTab ? (
-                <PanelRightClose aria-hidden="true" />
-              ) : (
-                <Columns2 aria-hidden="true" />
-              )}
-            </Button>
+            {canUseSplitView ? (
+              <Button
+                aria-label={splitTab ? "Close split view" : "Open split view"}
+                aria-pressed={Boolean(splitTab)}
+                className="hidden shrink-0 lg:inline-flex"
+                onClick={toggleSplitView}
+                size="icon"
+                type="button"
+                variant={splitTab ? "secondary" : "outline"}
+              >
+                {splitTab ? (
+                  <PanelRightClose aria-hidden="true" />
+                ) : (
+                  <Columns2 aria-hidden="true" />
+                )}
+              </Button>
+            ) : (
+              <div className="hidden size-9 shrink-0 lg:block" aria-hidden />
+            )}
 
             <TabsList
               aria-label="Document view"
@@ -539,6 +847,24 @@ export function MarkdownReader() {
       />
     </main>
   );
+}
+
+// Cheap fingerprint of everything that must be persisted, excluding transient
+// UI state such as `activeHeadingId`. File contents are represented by their
+// metadata (name/size/lastModified/source) — editing content bumps
+// `lastModified` and `size`, so real edits still change the signature without
+// having to serialize the (potentially multi-MB) content on every render.
+function getReaderPersistenceSignature(state: ReaderState) {
+  const tabSignatures = state.tabs.map((tab) => {
+    const file = tab.file;
+    const fileSignature = file
+      ? [file.name, file.size, file.lastModified, file.source].join("\u0000")
+      : "";
+
+    return [tab.id, tab.view, tab.error ?? "", fileSignature].join("\u0001");
+  });
+
+  return [state.activeTabId, ...tabSignatures].join("\u0002");
 }
 
 function useReaderTabModel(tab: ReaderTab | null): ReaderTabModel {

@@ -1,9 +1,35 @@
 "use client";
 
-import { AlertCircle, FileText, Plus, X } from "lucide-react";
+import { useState } from "react";
+import {
+  AlertCircle,
+  FileText,
+  HardDrive,
+  LoaderCircle,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { ModeToggle } from "@/components/mode-toggle";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -13,17 +39,28 @@ import { getReaderTabLabel } from "@/lib/markdown/document";
 import type { ReaderTab } from "@/lib/markdown/types";
 import { cn } from "@/lib/utils";
 
+type ReaderPersistenceStatus =
+  | "error"
+  | "restoring"
+  | "saved"
+  | "saving"
+  | "unavailable";
+
 export function ReaderTabs({
   activeTabId,
+  onClearSession,
   onCloseTab,
   onNewTab,
   onSelectTab,
+  persistenceStatus,
   tabs,
 }: {
   activeTabId: string;
+  onClearSession: () => void;
   onCloseTab: (tabId: string) => void;
   onNewTab: () => void;
   onSelectTab: (tabId: string) => void;
+  persistenceStatus: ReaderPersistenceStatus;
   tabs: ReaderTab[];
 }) {
   return (
@@ -113,9 +150,118 @@ export function ReaderTabs({
         </Tooltip>
       </div>
 
+      <ReaderStorageMenu
+        onClearSession={onClearSession}
+        status={persistenceStatus}
+      />
+
       <div className="mb-0.5 shrink-0">
         <ModeToggle />
       </div>
     </div>
+  );
+}
+
+function ReaderStorageMenu({
+  onClearSession,
+  status,
+}: {
+  onClearSession: () => void;
+  status: ReaderPersistenceStatus;
+}) {
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+  // Nothing is stored when persistence is unavailable — no control to show.
+  if (status === "unavailable") {
+    return null;
+  }
+
+  const isBusy = status === "restoring" || status === "saving";
+  const isError = status === "error";
+  const statusLabel =
+    status === "restoring"
+      ? "Restoring your session…"
+      : status === "saving"
+        ? "Saving to this browser…"
+        : status === "error"
+          ? "Autosave paused"
+          : "Saved to this browser";
+
+  const StatusIcon = isBusy ? LoaderCircle : isError ? AlertCircle : HardDrive;
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              aria-label={statusLabel}
+              className={cn(
+                "mb-0.5 size-9 shrink-0",
+                isError
+                  ? "text-destructive"
+                  : isBusy
+                    ? "text-[#03444A] dark:text-[#58D1E2]"
+                    : "text-muted-foreground",
+              )}
+              size="icon"
+              type="button"
+              variant="ghost"
+            />
+          }
+        >
+          <StatusIcon
+            className={cn("size-4", isBusy && "animate-spin")}
+            aria-hidden="true"
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-60">
+          <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground">
+            <StatusIcon
+              className={cn(
+                "size-3.5 shrink-0",
+                isBusy && "animate-spin",
+                isError && "text-destructive",
+              )}
+              aria-hidden="true"
+            />
+            {statusLabel}
+          </div>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => setIsConfirmOpen(true)}
+            variant="destructive"
+          >
+            <Trash2 aria-hidden="true" />
+            Clear saved documents
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog onOpenChange={setIsConfirmOpen} open={isConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear saved documents?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes every tab saved in this browser and starts a new,
+              empty session. Documents open right now will be closed. This
+              can&rsquo;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onClearSession();
+                setIsConfirmOpen(false);
+              }}
+              variant="destructive"
+            >
+              Clear documents
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
