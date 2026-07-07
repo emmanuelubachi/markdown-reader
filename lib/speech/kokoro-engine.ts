@@ -20,6 +20,7 @@ class KokoroEngine {
   private pending = new Map<number, PendingRequest>();
   private nextRequestId = 1;
   private cache = new Map<string, Blob>();
+  private inFlight = new Map<string, Promise<Blob>>();
   private progressListeners = new Set<(progress: number) => void>();
 
   state: KokoroEngineState = "idle";
@@ -67,13 +68,44 @@ class KokoroEngine {
     return this.cache.get(getCacheKey(text, voice)) ?? null;
   }
 
-  async generate(text: string, voice: KokoroVoiceId): Promise<Blob> {
-    const cached = this.getCached(text, voice);
+  generate(text: string, voice: KokoroVoiceId): Promise<Blob> {
+    const key = getCacheKey(text, voice);
+    const cached = this.cache.get(key);
 
     if (cached) {
-      return cached;
+      return Promise.resolve(cached);
     }
 
+    // De-duplicate concurrent requests for the same chunk so the play head and
+    // the look-ahead buffer never generate the same audio twice on the worker.
+    const existing = this.inFlight.get(key);
+
+    if (existing) {
+      return existing;
+    }
+
+    const promise = this.requestGeneration(key, text, voice);
+
+    this.inFlight.set(key, promise);
+    // Identity-checked cleanup: only forget this promise if it is still the
+    // current in-flight one. The trailing catch keeps the bookkeeping chain from
+    // surfacing an unhandled rejection — the caller still receives `promise`.
+    void promise
+      .finally(() => {
+        if (this.inFlight.get(key) === promise) {
+          this.inFlight.delete(key);
+        }
+      })
+      .catch(() => undefined);
+
+    return promise;
+  }
+
+  private async requestGeneration(
+    key: string,
+    text: string,
+    voice: KokoroVoiceId,
+  ): Promise<Blob> {
     await this.ensureReady();
 
     return new Promise<Blob>((resolve, reject) => {
@@ -81,7 +113,7 @@ class KokoroEngine {
 
       this.pending.set(id, {
         resolve: (blob) => {
-          this.storeInCache(getCacheKey(text, voice), blob);
+          this.storeInCache(key, blob);
           resolve(blob);
         },
         reject,
@@ -162,6 +194,7 @@ class KokoroEngine {
     }
 
     this.pending.clear();
+    this.inFlight.clear();
     this.worker?.terminate();
     this.worker = null;
   }

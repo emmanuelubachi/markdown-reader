@@ -63,6 +63,7 @@ import {
   rememberReadableSelection,
 } from "@/lib/markdown/speech";
 import { getDocumentStats } from "@/lib/markdown/stats";
+import { useReadAloud } from "@/hooks/use-read-aloud";
 import type {
   DocumentStats,
   HeadingBlock,
@@ -136,6 +137,9 @@ export function MarkdownReader() {
     );
   }, [activeTab.id, readerState.tabs, splitTabId]);
   const activeModel = useReaderTabModel(activeTab);
+  // Lifted here (instead of inside the toolbar) so playback survives tab
+  // switches — MarkdownReader stays mounted while the toolbar remounts per tab.
+  const reader = useReadAloud();
 
   const clearSaveIndicatorTimeout = useCallback(() => {
     if (saveIndicatorTimeoutRef.current === null) {
@@ -592,6 +596,11 @@ export function MarkdownReader() {
   }
 
   function closeTab(tabId: string) {
+    // Closing the document that is being read should stop its playback.
+    if (reader.sourceTabId === tabId) {
+      reader.stop();
+    }
+
     setSplitTabId((currentSplitTabId) =>
       currentSplitTabId === tabId ? null : currentSplitTabId,
     );
@@ -733,9 +742,11 @@ export function MarkdownReader() {
 
             {file ? (
               <ReadAloudToolbar
+                activeTabId={activeTab.id}
                 chunks={activeModel.readAloudChunks}
                 className="hidden min-w-0 flex-1 sm:flex"
-                key={`${activeTab.id}-${file.name}-${file.lastModified}-${file.size}`}
+                onSelectSourceTab={selectTab}
+                reader={reader}
               />
             ) : null}
 

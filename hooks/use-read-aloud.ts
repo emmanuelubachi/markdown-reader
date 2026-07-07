@@ -25,6 +25,17 @@ export type ReadAloudEngine = "device" | "natural";
 
 const STORAGE_KEY = "markdown-reader:read-aloud";
 
+// How many passages the natural voice keeps generated ahead of the play head.
+// A small rolling buffer starts playback fastest and stays well within the
+// engine's audio cache — the YouTube "buffer a little ahead, then wait" model.
+const BUFFER_AHEAD = 3;
+
+function delay(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
 type StoredPrefs = {
   engine?: ReadAloudEngine;
   deviceVoiceURI?: string | null;
@@ -77,14 +88,24 @@ function getKokoroProgressServerSnapshot(): number | null {
   return null;
 }
 
-export function useReadAloud(chunks: string[]) {
-  const chunksRef = useRef(chunks);
+export function useReadAloud() {
+  const chunksRef = useRef<string[]>([]);
   const sessionRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const playbackIndexRef = useRef(0);
   const [speechStatus, setSpeechStatus] =
     useState<Exclude<ReadAloudStatus, "unsupported">>("idle");
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Highest passage index whose audio is generated (buffered) this session, or
+  // -1 when nothing is buffered. Drives the lighter "download" bar. Only the
+  // natural engine fills it; the device voice is streamed by the OS.
+  const [bufferedIndex, setBufferedIndex] = useState(-1);
+  // Which reader tab the current playback belongs to, and how many passages it
+  // captured at start. These let a single lifted player keep reading one tab's
+  // document while the user views another tab.
+  const [sourceTabId, setSourceTabId] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
   const [rate, setRateState] = useState(() => {
     const storedRate = readStoredPrefs().rate;
 
@@ -113,8 +134,6 @@ export function useReadAloud(chunks: string[]) {
     getKokoroProgressSnapshot,
     getKokoroProgressServerSnapshot,
   );
-
-  chunksRef.current = chunks;
 
   const rateRef = useRef(rate);
   const engineRef = useRef(engine);
@@ -209,6 +228,9 @@ export function useReadAloud(chunks: string[]) {
 
     cleanupAudio();
     setCurrentIndex(0);
+    setBufferedIndex(-1);
+    setTotal(0);
+    setSourceTabId(null);
     setSpeechStatus("idle");
   }
 
@@ -283,15 +305,18 @@ export function useReadAloud(chunks: string[]) {
     const voice = kokoroVoiceRef.current;
     const cached = kokoro.getCached(readableChunks[index], voice);
 
+    playbackIndexRef.current = index;
     setCurrentIndex(index);
 
     if (!cached) {
+      // The buffer has not caught up to the play head yet — show "buffering".
       setSpeechStatus("loading");
     }
 
     let blob: Blob;
 
     try {
+      // Deduped against the buffer loop, so this reuses its in-flight job.
       blob = cached ?? (await kokoro.generate(readableChunks[index], voice));
     } catch {
       if (session === sessionRef.current) {
@@ -303,12 +328,6 @@ export function useReadAloud(chunks: string[]) {
 
     if (session !== sessionRef.current) {
       return;
-    }
-
-    if (index + 1 < readableChunks.length) {
-      void kokoro
-        .generate(readableChunks[index + 1], voice)
-        .catch(() => undefined);
     }
 
     cleanupAudio();
@@ -338,12 +357,51 @@ export function useReadAloud(chunks: string[]) {
     });
   }
 
-  function start(startIndex = 0) {
+  // Generates audio ahead of the play head, staying at most BUFFER_AHEAD
+  // passages in front, and advances `bufferedIndex` as each one is ready.
+  async function bufferLoop(session: number, startIndex: number) {
+    const kokoro = getKokoroEngine();
     const readableChunks = chunksRef.current;
 
+    for (let index = startIndex; index < readableChunks.length; index++) {
+      // Throttle: don't run more than BUFFER_AHEAD ahead of what's playing.
+      // Polling keeps this deadlock-free and unparks within ~120ms of a
+      // session change (stop / restart / voice or engine change / unmount).
+      while (
+        session === sessionRef.current &&
+        index > playbackIndexRef.current + BUFFER_AHEAD
+      ) {
+        await delay(120);
+      }
+
+      if (session !== sessionRef.current) {
+        return;
+      }
+
+      const voice = kokoroVoiceRef.current;
+
+      if (!kokoro.getCached(readableChunks[index], voice)) {
+        try {
+          await kokoro.generate(readableChunks[index], voice);
+        } catch {
+          return;
+        }
+      }
+
+      if (session !== sessionRef.current) {
+        return;
+      }
+
+      setBufferedIndex((previous) => Math.max(previous, index));
+    }
+  }
+
+  function start(readableChunks: string[], sourceId: string, startIndex = 0) {
     if (!readableChunks.length || !engineSupported) {
       return;
     }
+
+    chunksRef.current = readableChunks;
 
     const safeStartIndex = Math.min(
       Math.max(startIndex, 0),
@@ -359,16 +417,21 @@ export function useReadAloud(chunks: string[]) {
     }
 
     cleanupAudio();
+    setBufferedIndex(-1);
+    setSourceTabId(sourceId);
+    setTotal(readableChunks.length);
 
     if (engineRef.current === "natural") {
+      playbackIndexRef.current = safeStartIndex;
+      void bufferLoop(session, safeStartIndex);
       void playNaturalChunk(safeStartIndex, session);
     } else {
       speakDeviceChunk(safeStartIndex, session);
     }
   }
 
-  function startFromSelection() {
-    start(getSelectedChunkIndex(chunksRef.current) ?? 0);
+  function startFromSelection(readableChunks: string[], sourceId: string) {
+    start(readableChunks, sourceId, getSelectedChunkIndex(readableChunks) ?? 0);
   }
 
   function pause() {
@@ -408,6 +471,9 @@ export function useReadAloud(chunks: string[]) {
 
     cleanupAudio();
     setCurrentIndex(0);
+    setBufferedIndex(-1);
+    setTotal(0);
+    setSourceTabId(null);
     setSpeechStatus("idle");
   }
 
@@ -444,6 +510,7 @@ export function useReadAloud(chunks: string[]) {
   }
 
   return {
+    bufferedIndex,
     currentIndex,
     deviceSupported,
     deviceVoiceURI,
@@ -459,12 +526,16 @@ export function useReadAloud(chunks: string[]) {
     setEngine,
     setKokoroVoice,
     setRate,
+    sourceTabId,
     start,
     startFromSelection,
     status,
     stop,
+    total,
   };
 }
+
+export type ReadAloudController = ReturnType<typeof useReadAloud>;
 
 export function getReadAloudStatusText(
   status: ReadAloudStatus,

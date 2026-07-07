@@ -1,6 +1,14 @@
 "use client";
 
-import { AudioLines, Loader2, Pause, Play, Square, Volume2 } from "lucide-react";
+import {
+  AudioLines,
+  Loader2,
+  Music,
+  Pause,
+  Play,
+  Square,
+  Volume2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,38 +28,67 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getReadAloudStatusText, useReadAloud } from "@/hooks/use-read-aloud";
+import {
+  getReadAloudStatusText,
+  type ReadAloudController,
+  type ReadAloudStatus,
+} from "@/hooks/use-read-aloud";
 import { isNaturalSoundingVoice } from "@/lib/speech/device-voices";
 import { KOKORO_VOICES } from "@/lib/speech/kokoro-messages";
 import { cn } from "@/lib/utils";
 
 export function ReadAloudToolbar({
+  reader,
   chunks,
+  activeTabId,
+  onSelectSourceTab,
   className,
 }: {
+  reader: ReadAloudController;
   chunks: string[];
+  activeTabId: string;
+  onSelectSourceTab: (tabId: string) => void;
   className?: string;
 }) {
-  const reader = useReadAloud(chunks);
   const hasReadableText = chunks.length > 0;
-  const isPlaying = reader.status === "playing";
-  const isPaused = reader.status === "paused";
-  const isLoading = reader.status === "loading";
+  // The single lifted player may be reading a different tab's document. This
+  // toolbar only reflects playback that belongs to the tab currently on screen.
+  const isSource =
+    reader.sourceTabId != null && reader.sourceTabId === activeTabId;
+  const sessionActive =
+    reader.status === "playing" ||
+    reader.status === "paused" ||
+    reader.status === "loading";
+  const isBusyElsewhere =
+    reader.sourceTabId != null && !isSource && sessionActive;
+
+  const localStatus: ReadAloudStatus = isSource ? reader.status : "idle";
+  const localTotal = isSource ? reader.total : chunks.length;
+  const localIndex = isSource ? reader.currentIndex : 0;
+
+  const isPlaying = isSource && reader.status === "playing";
+  const isPaused = isSource && reader.status === "paused";
+  const isLoading = isSource && reader.status === "loading";
   const canRead = hasReadableText && reader.status !== "unsupported";
   const currentPosition =
-    reader.status === "idle"
-      ? 0
-      : Math.min(reader.currentIndex + 1, chunks.length);
-  const progress =
-    chunks.length > 0 ? (currentPosition / chunks.length) * 100 : 0;
+    localStatus === "idle" ? 0 : Math.min(localIndex + 1, localTotal);
+  const progress = localTotal > 0 ? (currentPosition / localTotal) * 100 : 0;
   const statusText = getReadAloudStatusText(
-    reader.status,
+    localStatus,
     currentPosition,
-    chunks.length,
+    localTotal,
     reader.modelProgress,
   );
   const isDownloadingModel =
     isLoading && reader.modelProgress != null && reader.modelProgress < 1;
+  // Lighter "buffered ahead" fill: only for the tab actually being read, once
+  // the natural voice has generated at least one passage and the model is done.
+  const showBuffered =
+    isSource && reader.bufferedIndex >= 0 && !isDownloadingModel;
+  const bufferedPercent =
+    localTotal > 0
+      ? (Math.min(reader.bufferedIndex + 1, localTotal) / localTotal) * 100
+      : 0;
 
   return (
     <div
@@ -82,7 +119,7 @@ export function ReadAloudToolbar({
                   ? reader.pause
                   : isPaused
                     ? reader.resume
-                    : reader.startFromSelection
+                    : () => reader.startFromSelection(chunks, activeTabId)
               }
               size="icon-sm"
               type="button"
@@ -132,16 +169,30 @@ export function ReadAloudToolbar({
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <div
           aria-label="Reading progress"
-          aria-valuemax={chunks.length}
+          aria-valuemax={localTotal}
           aria-valuemin={0}
           aria-valuenow={currentPosition}
-          className="h-1.5 min-w-8 flex-1 overflow-hidden rounded-full bg-muted"
+          aria-valuetext={
+            showBuffered
+              ? `${currentPosition} of ${localTotal} playing, buffered to ${Math.min(
+                  reader.bufferedIndex + 1,
+                  localTotal,
+                )}`
+              : undefined
+          }
+          className="relative h-1.5 min-w-8 flex-1 overflow-hidden rounded-full bg-muted"
           role="progressbar"
           title={statusText}
         >
+          {showBuffered ? (
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-[#03444A]/25 transition-[width] dark:bg-[#58D1E2]/25"
+              style={{ width: `${bufferedPercent}%` }}
+            />
+          ) : null}
           <div
             className={cn(
-              "h-full rounded-full bg-[#03444A] transition-[width] dark:bg-[#58D1E2]",
+              "absolute inset-y-0 left-0 rounded-full bg-[#03444A] transition-[width] dark:bg-[#58D1E2]",
               isDownloadingModel && "animate-pulse",
             )}
             style={{
@@ -155,10 +206,37 @@ export function ReadAloudToolbar({
           {isDownloadingModel
             ? `${Math.round((reader.modelProgress ?? 0) * 100)}%`
             : hasReadableText
-              ? `${currentPosition}/${chunks.length}`
+              ? `${currentPosition}/${localTotal}`
               : "—"}
         </span>
       </div>
+
+      {/* Playing-elsewhere indicator: audio belongs to another tab */}
+      {isBusyElsewhere ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label="Go to the tab that is playing"
+                className="h-7 shrink-0 gap-1.5 rounded-full px-2.5 text-xs font-medium"
+                onClick={() =>
+                  reader.sourceTabId && onSelectSourceTab(reader.sourceTabId)
+                }
+                size="sm"
+                type="button"
+                variant="ghost"
+              />
+            }
+          >
+            <Music
+              aria-hidden="true"
+              className="size-3.5 animate-pulse text-[#03444A] dark:text-[#58D1E2]"
+            />
+            <span className="hidden sm:inline">Playing on another tab</span>
+          </TooltipTrigger>
+          <TooltipContent>Go to the tab that&rsquo;s playing</TooltipContent>
+        </Tooltip>
+      ) : null}
 
       {/* Speed */}
       <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
