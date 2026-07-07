@@ -165,7 +165,10 @@ export function useReadAloud(chunks: string[]) {
   }, []);
 
   useEffect(() => {
-    return () => {
+    // Shared teardown for both React unmount (tab close/switch) and a hard
+    // browser tab/window close, where unmount effects are not guaranteed to run
+    // and speechSynthesis — a browser-global service — can keep speaking.
+    function teardown() {
       sessionRef.current += 1;
 
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -173,8 +176,14 @@ export function useReadAloud(chunks: string[]) {
       }
 
       cleanupAudio();
+    }
+
+    window.addEventListener("pagehide", teardown);
+
+    return () => {
+      window.removeEventListener("pagehide", teardown);
+      teardown();
     };
-     
   }, []);
 
   function cleanupAudio() {
