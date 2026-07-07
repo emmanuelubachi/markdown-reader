@@ -40,17 +40,17 @@ Markdown is rendered with [react-markdown](https://github.com/remarkjs/react-mar
 
 ## Tech Stack
 
-| Area       | Technology                                                        |
-| ---------- | ----------------------------------------------------------------- |
-| Framework  | [Next.js 16](https://nextjs.org) (App Router, Turbopack)          |
-| UI runtime | [React 19](https://react.dev)                                     |
-| Language   | [TypeScript 5](https://www.typescriptlang.org)                    |
-| Styling    | [Tailwind CSS 4](https://tailwindcss.com)                         |
-| Components | [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com) |
+| Area       | Technology                                                                     |
+| ---------- | ------------------------------------------------------------------------------ |
+| Framework  | [Next.js 16](https://nextjs.org) (App Router, Turbopack)                       |
+| UI runtime | [React 19](https://react.dev)                                                  |
+| Language   | [TypeScript 5](https://www.typescriptlang.org)                                 |
+| Styling    | [Tailwind CSS 4](https://tailwindcss.com)                                      |
+| Components | [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com)           |
 | Markdown   | [react-markdown](https://github.com/remarkjs/react-markdown) · remark · rehype |
-| Icons      | [lucide-react](https://lucide.dev)                                |
-| Theming    | [next-themes](https://github.com/pacocoursey/next-themes)         |
-| Package    | [pnpm](https://pnpm.io)                                           |
+| Icons      | [lucide-react](https://lucide.dev)                                             |
+| Theming    | [next-themes](https://github.com/pacocoursey/next-themes)                      |
+| Package    | [pnpm](https://pnpm.io)                                                        |
 
 ## Getting Started
 
@@ -65,12 +65,12 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### Scripts
 
-| Command      | Description                          |
-| ------------ | ----------------------------------- |
-| `pnpm dev`   | Start the development server        |
-| `pnpm build` | Create a production build           |
-| `pnpm start` | Run the production build            |
-| `pnpm lint`  | Lint the project with ESLint        |
+| Command      | Description                  |
+| ------------ | ---------------------------- |
+| `pnpm dev`   | Start the development server |
+| `pnpm build` | Create a production build    |
+| `pnpm start` | Run the production build     |
+| `pnpm lint`  | Lint the project with ESLint |
 
 ## Project Structure
 
