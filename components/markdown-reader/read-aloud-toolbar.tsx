@@ -1,16 +1,27 @@
 "use client";
 
+import type { KeyboardEvent } from "react";
+
 import {
   AudioLines,
+  ListTree,
   Loader2,
   Music,
   Pause,
   Play,
+  SkipBack,
+  SkipForward,
   Square,
   Volume2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -34,18 +45,21 @@ import {
   type ReadAloudStatus,
 } from "@/hooks/use-read-aloud";
 import { isNaturalSoundingVoice } from "@/lib/speech/device-voices";
+import type { SpeechSection } from "@/lib/markdown/speech";
 import { KOKORO_VOICES } from "@/lib/speech/kokoro-messages";
 import { cn } from "@/lib/utils";
 
 export function ReadAloudToolbar({
   reader,
   chunks,
+  sections,
   activeTabId,
   onSelectSourceTab,
   className,
 }: {
   reader: ReadAloudController;
   chunks: string[];
+  sections: SpeechSection[];
   activeTabId: string;
   onSelectSourceTab: (tabId: string) => void;
   className?: string;
@@ -89,6 +103,66 @@ export function ReadAloudToolbar({
     localTotal > 0
       ? (Math.min(reader.bufferedIndex + 1, localTotal) / localTotal) * 100
       : 0;
+  // Seeking only applies to a live session on the tab currently on screen.
+  const canSeek = isSource && sessionActive && localTotal > 0;
+  const atStart = reader.currentIndex <= 0;
+  const atEnd = reader.currentIndex >= localTotal - 1;
+
+  function seekToClientX(clientX: number, rect: DOMRect) {
+    if (rect.width <= 0 || localTotal <= 0) {
+      return;
+    }
+
+    const fraction = Math.min(
+      Math.max((clientX - rect.left) / rect.width, 0),
+      1,
+    );
+
+    reader.seek(Math.min(Math.floor(fraction * localTotal), localTotal - 1));
+  }
+
+  function handleSeekKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowUp":
+        event.preventDefault();
+        reader.seek(Math.min(reader.currentIndex + 1, localTotal - 1));
+        break;
+      case "ArrowLeft":
+      case "ArrowDown":
+        event.preventDefault();
+        reader.seek(Math.max(reader.currentIndex - 1, 0));
+        break;
+      case "Home":
+        event.preventDefault();
+        reader.seek(0);
+        break;
+      case "End":
+        event.preventDefault();
+        reader.seek(localTotal - 1);
+        break;
+    }
+  }
+
+  // Jump to a heading's section: seek if this tab is already playing, otherwise
+  // start reading this tab from that section.
+  function jumpToSection(chunkIndex: number) {
+    if (canSeek) {
+      reader.seek(chunkIndex);
+    } else if (canRead) {
+      reader.start(chunks, activeTabId, chunkIndex);
+    }
+  }
+
+  // The section the play head currently sits in (last heading at or before it).
+  const activeSectionIndex =
+    isSource && sections.length > 0
+      ? sections.reduce(
+          (found, section, index) =>
+            section.chunkIndex <= localIndex ? index : found,
+          -1,
+        )
+      : -1;
 
   return (
     <div
@@ -98,6 +172,25 @@ export function ReadAloudToolbar({
       )}
     >
       <Volume2 className="size-4 shrink-0 text-[#03444A] dark:text-[#58D1E2]" />
+
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              aria-label="Rewind one passage"
+              className="size-7 shrink-0 rounded-full"
+              disabled={!canSeek || atStart}
+              onClick={() => reader.seekBy(-1)}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            />
+          }
+        >
+          <SkipBack aria-hidden="true" />
+        </TooltipTrigger>
+        <TooltipContent>Previous passage</TooltipContent>
+      </Tooltip>
 
       <Tooltip>
         <TooltipTrigger
@@ -150,6 +243,25 @@ export function ReadAloudToolbar({
         <TooltipTrigger
           render={
             <Button
+              aria-label="Skip to next passage"
+              className="size-7 shrink-0 rounded-full"
+              disabled={!canSeek || atEnd}
+              onClick={() => reader.seekBy(1)}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            />
+          }
+        >
+          <SkipForward aria-hidden="true" />
+        </TooltipTrigger>
+        <TooltipContent>Next passage</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
               aria-label="Stop reading"
               className="size-7 shrink-0 rounded-full"
               disabled={!isPlaying && !isPaused && !isLoading}
@@ -168,7 +280,7 @@ export function ReadAloudToolbar({
       {/* Progress fills the reclaimed space */}
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <div
-          aria-label="Reading progress"
+          aria-label={canSeek ? "Seek reading position" : "Reading progress"}
           aria-valuemax={localTotal}
           aria-valuemin={0}
           aria-valuenow={currentPosition}
@@ -180,27 +292,44 @@ export function ReadAloudToolbar({
                 )}`
               : undefined
           }
-          className="relative h-1.5 min-w-8 flex-1 overflow-hidden rounded-full bg-muted"
-          role="progressbar"
+          className={cn(
+            "relative h-1.5 min-w-8 flex-1 rounded-full",
+            canSeek &&
+              "cursor-pointer before:absolute before:inset-x-0 before:-inset-y-2 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+          )}
+          onClick={
+            canSeek
+              ? (event) =>
+                  seekToClientX(
+                    event.clientX,
+                    event.currentTarget.getBoundingClientRect(),
+                  )
+              : undefined
+          }
+          onKeyDown={canSeek ? handleSeekKeyDown : undefined}
+          role={canSeek ? "slider" : "progressbar"}
+          tabIndex={canSeek ? 0 : undefined}
           title={statusText}
         >
-          {showBuffered ? (
+          <div className="absolute inset-0 overflow-hidden rounded-full bg-muted">
+            {showBuffered ? (
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-[#03444A]/25 transition-[width] dark:bg-[#58D1E2]/25"
+                style={{ width: `${bufferedPercent}%` }}
+              />
+            ) : null}
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-[#03444A]/25 transition-[width] dark:bg-[#58D1E2]/25"
-              style={{ width: `${bufferedPercent}%` }}
+              className={cn(
+                "absolute inset-y-0 left-0 rounded-full bg-[#03444A] transition-[width] dark:bg-[#58D1E2]",
+                isDownloadingModel && "animate-pulse",
+              )}
+              style={{
+                width: isDownloadingModel
+                  ? `${Math.round((reader.modelProgress ?? 0) * 100)}%`
+                  : `${progress}%`,
+              }}
             />
-          ) : null}
-          <div
-            className={cn(
-              "absolute inset-y-0 left-0 rounded-full bg-[#03444A] transition-[width] dark:bg-[#58D1E2]",
-              isDownloadingModel && "animate-pulse",
-            )}
-            style={{
-              width: isDownloadingModel
-                ? `${Math.round((reader.modelProgress ?? 0) * 100)}%`
-                : `${progress}%`,
-            }}
-          />
+          </div>
         </div>
         <span className="hidden shrink-0 tabular-nums text-xs text-muted-foreground md:inline">
           {isDownloadingModel
@@ -253,7 +382,9 @@ export function ReadAloudToolbar({
           id="read-aloud-rate"
           max="1.5"
           min="0.75"
-          onChange={(event) => reader.setRate(Number(event.currentTarget.value))}
+          onChange={(event) =>
+            reader.setRate(Number(event.currentTarget.value))
+          }
           step="0.05"
           type="range"
           value={reader.rate}
@@ -262,6 +393,45 @@ export function ReadAloudToolbar({
           {reader.rate.toFixed(2).replace(/0$/, "")}x
         </span>
       </div>
+
+      {/* Jump to a section (heading) */}
+      {sections.length > 0 ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                aria-label="Jump to section"
+                className="size-7 shrink-0 rounded-full"
+                disabled={!canRead}
+                size="icon-sm"
+                title="Jump to section"
+                type="button"
+                variant="ghost"
+              />
+            }
+          >
+            <ListTree aria-hidden="true" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="max-h-72 w-64 scrollbar-hide"
+          >
+            {sections.map((section, index) => (
+              <DropdownMenuItem
+                key={`${section.id}-${section.chunkIndex}`}
+                className={cn(
+                  index === activeSectionIndex &&
+                    "font-medium text-[#03444A] dark:text-[#58D1E2]",
+                )}
+                onClick={() => jumpToSection(section.chunkIndex)}
+                style={{ paddingLeft: `${(section.level - 1) * 12 + 8}px` }}
+              >
+                <span className="min-w-0 flex-1 truncate">{section.text}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
 
       {/* Voice settings */}
       <Popover>

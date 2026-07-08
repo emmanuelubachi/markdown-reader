@@ -59,8 +59,9 @@ import {
   saveReaderSession,
 } from "@/lib/markdown/persistence";
 import {
-  getReadableChunks,
+  getReadableSpeech,
   rememberReadableSelection,
+  type SpeechSection,
 } from "@/lib/markdown/speech";
 import { getDocumentStats } from "@/lib/markdown/stats";
 import { useReadAloud } from "@/hooks/use-read-aloud";
@@ -79,6 +80,7 @@ type ReaderTabModel = {
   headings: HeadingBlock[];
   outlineActiveHeadingId: null | string;
   readAloudChunks: string[];
+  readAloudSections: SpeechSection[];
   stats: DocumentStats;
 };
 
@@ -747,6 +749,7 @@ export function MarkdownReader() {
                 className="hidden min-w-0 flex-1 sm:flex"
                 onSelectSourceTab={selectTab}
                 reader={reader}
+                sections={activeModel.readAloudSections}
               />
             ) : null}
 
@@ -887,7 +890,10 @@ function useReaderTabModel(tab: ReaderTab | null): ReaderTabModel {
     () => blocks.filter((block) => block.type === "heading"),
     [blocks],
   );
-  const readAloudChunks = useMemo(() => getReadableChunks(blocks), [blocks]);
+  const { chunks: readAloudChunks, sections: readAloudSections } = useMemo(
+    () => getReadableSpeech(blocks),
+    [blocks],
+  );
   const outlineActiveHeadingId = useMemo(() => {
     if (
       activeHeadingId &&
@@ -904,6 +910,7 @@ function useReaderTabModel(tab: ReaderTab | null): ReaderTabModel {
     headings,
     outlineActiveHeadingId,
     readAloudChunks,
+    readAloudSections,
     stats,
   };
 }

@@ -5,50 +5,90 @@ const REMEMBERED_SELECTION_MAX_AGE_MS = 10_000;
 let rememberedReadableSelection: { text: string; timestamp: number } | null =
   null;
 
+// A heading and the flat chunk index where its section starts, so the reader
+// can fast-forward playback to a specific section of the document.
+export type SpeechSection = {
+  chunkIndex: number;
+  id: string;
+  level: number;
+  text: string;
+};
+
 export function getReadableChunks(blocks: MarkdownBlock[]) {
-  return blocks.flatMap((block) => {
-    switch (block.type) {
-      case "heading":
-      case "paragraph":
-        return splitSpeechText(block.text);
-      case "blockquote":
-        return splitSpeechText(`Quote. ${block.text}`);
-      case "list":
-        return block.items.flatMap((item, index) =>
-          splitSpeechText(`Item ${index + 1}. ${item}`),
-        );
-      case "table": {
-        const headers = block.headers.map(toPlainSpeechText);
-        const rows =
-          block.rows.length > 0
-            ? block.rows
-            : block.headers.length > 0
-              ? [block.headers]
-              : [];
+  return getReadableSpeech(blocks).chunks;
+}
 
-        return rows.flatMap((row) => {
-          const rowText = row
-            .map((cell, index) => {
-              const text = toPlainSpeechText(cell);
-              const header = headers[index];
+// Flattens blocks into speech chunks and, in the same pass, records the chunk
+// index at which each heading's section begins.
+export function getReadableSpeech(blocks: MarkdownBlock[]): {
+  chunks: string[];
+  sections: SpeechSection[];
+} {
+  const chunks: string[] = [];
+  const sections: SpeechSection[] = [];
 
-              if (!text) {
-                return "";
-              }
+  for (const block of blocks) {
+    const blockChunks = getBlockChunks(block);
 
-              return header && header !== text ? `${header}: ${text}` : text;
-            })
-            .filter(Boolean)
-            .join(". ");
-
-          return splitSpeechText(rowText);
-        });
-      }
-      case "code":
-      case "hr":
-        return [];
+    if (block.type === "heading" && blockChunks.length > 0) {
+      sections.push({
+        chunkIndex: chunks.length,
+        id: block.id,
+        level: block.level,
+        text: toPlainSpeechText(block.text),
+      });
     }
-  });
+
+    for (const chunk of blockChunks) {
+      chunks.push(chunk);
+    }
+  }
+
+  return { chunks, sections };
+}
+
+function getBlockChunks(block: MarkdownBlock): string[] {
+  switch (block.type) {
+    case "heading":
+    case "paragraph":
+      return splitSpeechText(block.text);
+    case "blockquote":
+      return splitSpeechText(`Quote. ${block.text}`);
+    case "list":
+      return block.items.flatMap((item, index) =>
+        splitSpeechText(`Item ${index + 1}. ${item}`),
+      );
+    case "table": {
+      const headers = block.headers.map(toPlainSpeechText);
+      const rows =
+        block.rows.length > 0
+          ? block.rows
+          : block.headers.length > 0
+            ? [block.headers]
+            : [];
+
+      return rows.flatMap((row) => {
+        const rowText = row
+          .map((cell, index) => {
+            const text = toPlainSpeechText(cell);
+            const header = headers[index];
+
+            if (!text) {
+              return "";
+            }
+
+            return header && header !== text ? `${header}: ${text}` : text;
+          })
+          .filter(Boolean)
+          .join(". ");
+
+        return splitSpeechText(rowText);
+      });
+    }
+    case "code":
+    case "hr":
+      return [];
+  }
 }
 
 function splitSpeechText(text: string) {
