@@ -67,7 +67,7 @@ export function ReaderTabs({
     <div className="flex items-end gap-1 px-2.5 pt-2 sm:px-3">
       <div
         aria-label="Reader tabs"
-        className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto"
+        className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto scrollbar-hide"
         role="tablist"
       >
         {tabs.map((tab, index) => {
