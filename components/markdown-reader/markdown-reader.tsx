@@ -39,10 +39,7 @@ import {
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  ACCEPTED_FILE_TYPES,
-  MAX_FILE_SIZE,
-} from "@/lib/markdown/constants";
+import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/markdown/constants";
 import {
   createReaderTab,
   getPastedDocumentName,
@@ -170,9 +167,10 @@ export function MarkdownReader() {
     readerStateRef.current = readerState;
   }, [readerState]);
 
-  useEffect(() => () => clearSaveIndicatorTimeout(), [
-    clearSaveIndicatorTimeout,
-  ]);
+  useEffect(
+    () => () => clearSaveIndicatorTimeout(),
+    [clearSaveIndicatorTimeout],
+  );
 
   // Persist-worthy fingerprint of the session. Excludes transient UI state
   // (e.g. the scroll-driven active heading) so scrolling never triggers a save.
@@ -556,7 +554,8 @@ export function MarkdownReader() {
     // autosave effect doesn't immediately re-write it after we wipe storage.
     didChangeBeforeRestoreRef.current = true;
     readerStateRef.current = nextState;
-    lastPersistedSignatureRef.current = getReaderPersistenceSignature(nextState);
+    lastPersistedSignatureRef.current =
+      getReaderPersistenceSignature(nextState);
     setReaderState(nextState);
     rememberActiveReaderTabId(nextState.activeTabId);
 
@@ -769,9 +768,32 @@ export function MarkdownReader() {
                   <Columns2 aria-hidden="true" />
                 )}
               </Button>
-            ) : (
-              <div className="hidden size-9 shrink-0 lg:block" aria-hidden />
-            )}
+            ) : null}
+
+            {file ? (
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Button
+                  aria-label="Open a Markdown file"
+                  onClick={openFilePicker}
+                  size="icon"
+                  title="Open file"
+                  type="button"
+                  variant="outline"
+                >
+                  <Upload aria-hidden="true" />
+                </Button>
+                <Button
+                  aria-label="Paste Markdown"
+                  onClick={() => setIsPasteDialogOpen(true)}
+                  size="icon"
+                  title="Paste markdown"
+                  type="button"
+                  variant="outline"
+                >
+                  <ClipboardPaste aria-hidden="true" />
+                </Button>
+              </div>
+            ) : null}
 
             <TabsList
               aria-label="Document view"
@@ -964,29 +986,6 @@ function SingleReaderView({
               onReset={onReset}
               stats={activeModel.stats}
             />
-
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                className="justify-center"
-                onClick={onChooseFile}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                <Upload aria-hidden="true" />
-                Open
-              </Button>
-              <Button
-                className="justify-center"
-                onClick={onOpenPaste}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                <ClipboardPaste aria-hidden="true" />
-                Paste
-              </Button>
-            </div>
           </div>
 
           <Outline
@@ -1281,7 +1280,10 @@ function SourceView({
           const textarea = event.currentTarget;
 
           rememberReadableSelection(
-            textarea.value.slice(textarea.selectionStart, textarea.selectionEnd),
+            textarea.value.slice(
+              textarea.selectionStart,
+              textarea.selectionEnd,
+            ),
           );
         }}
         spellCheck={false}

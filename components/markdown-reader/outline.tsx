@@ -21,7 +21,7 @@ export function Outline({
         </h2>
       </div>
       {headings.length > 0 ? (
-        <nav className="mt-1 min-h-0 flex-1 space-y-0.5 overflow-auto pr-1">
+        <nav className="mt-1 min-h-0 flex-1 space-y-0.5 overflow-auto p-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 scrollbar-hover:scrollbar-thumb-muted-foreground/50">
           {headings.slice(0, 36).map((heading) => {
             const isActive = heading.id === activeHeadingId;
 
