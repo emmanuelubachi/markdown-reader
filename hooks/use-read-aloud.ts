@@ -284,6 +284,7 @@ export function useReadAloud() {
       }
     };
 
+    playbackIndexRef.current = index;
     setCurrentIndex(index);
     setSpeechStatus("playing");
     window.speechSynthesis.speak(utterance);
@@ -396,13 +397,10 @@ export function useReadAloud() {
     }
   }
 
-  function start(readableChunks: string[], sourceId: string, startIndex = 0) {
-    if (!readableChunks.length || !engineSupported) {
-      return;
-    }
-
-    chunksRef.current = readableChunks;
-
+  // Restart the active session's playback at a passage index, without touching
+  // which tab/document owns it. Shared by start() and seek().
+  function beginPlaybackAt(startIndex: number) {
+    const readableChunks = chunksRef.current;
     const safeStartIndex = Math.min(
       Math.max(startIndex, 0),
       readableChunks.length - 1,
@@ -418,16 +416,42 @@ export function useReadAloud() {
 
     cleanupAudio();
     setBufferedIndex(-1);
-    setSourceTabId(sourceId);
-    setTotal(readableChunks.length);
+    playbackIndexRef.current = safeStartIndex;
 
     if (engineRef.current === "natural") {
-      playbackIndexRef.current = safeStartIndex;
       void bufferLoop(session, safeStartIndex);
       void playNaturalChunk(safeStartIndex, session);
     } else {
       speakDeviceChunk(safeStartIndex, session);
     }
+  }
+
+  function start(readableChunks: string[], sourceId: string, startIndex = 0) {
+    if (!readableChunks.length || !engineSupported) {
+      return;
+    }
+
+    chunksRef.current = readableChunks;
+    setSourceTabId(sourceId);
+    setTotal(readableChunks.length);
+    beginPlaybackAt(startIndex);
+  }
+
+  // Jump the current session to another passage (fast-forward / rewind).
+  // Rewinding replays cached audio instantly; seeking past the buffer shows the
+  // usual "buffering" state while that passage generates.
+  function seek(targetIndex: number) {
+    if (sourceTabId == null || !chunksRef.current.length || !engineSupported) {
+      return;
+    }
+
+    beginPlaybackAt(targetIndex);
+  }
+
+  // Step relative to the live play head (not React state), so rapid prev/next
+  // clicks accumulate correctly instead of collapsing onto one stale index.
+  function seekBy(delta: number) {
+    seek(playbackIndexRef.current + delta);
   }
 
   function startFromSelection(readableChunks: string[], sourceId: string) {
@@ -522,6 +546,8 @@ export function useReadAloud() {
     pause,
     rate,
     resume,
+    seek,
+    seekBy,
     setDeviceVoiceURI,
     setEngine,
     setKokoroVoice,
