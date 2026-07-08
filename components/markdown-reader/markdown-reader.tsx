@@ -688,7 +688,7 @@ export function MarkdownReader() {
             tabs={readerState.tabs}
           />
 
-          <div className="flex items-center gap-2 px-2.5 py-2 sm:px-3">
+          <div className="flex items-center gap-1.5 px-2.5 py-2 sm:px-3">
             <div className="hidden items-center mr-1.5 sm:flex">
               {/* Brand mark: dark-colored variant in light mode, teal in dark mode. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -760,7 +760,7 @@ export function MarkdownReader() {
                 onClick={toggleSplitView}
                 size="icon"
                 type="button"
-                variant={splitTab ? "secondary" : "outline"}
+                variant="secondary"
               >
                 {splitTab ? (
                   <PanelRightClose aria-hidden="true" />
@@ -778,7 +778,7 @@ export function MarkdownReader() {
                   size="icon"
                   title="Open file"
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                 >
                   <Upload aria-hidden="true" />
                 </Button>
@@ -788,7 +788,7 @@ export function MarkdownReader() {
                   size="icon"
                   title="Paste markdown"
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                 >
                   <ClipboardPaste aria-hidden="true" />
                 </Button>
@@ -832,7 +832,6 @@ export function MarkdownReader() {
               <SplitReaderView
                 activeTabId={activeTab.id}
                 className="hidden lg:flex"
-                onCloseSplit={() => setSplitTabId(null)}
                 onSelectSplitTab={setSplitTabId}
                 onSourceChange={editTabContent}
                 primaryTab={activeTab}
@@ -1059,7 +1058,6 @@ function SingleReaderView({
 function SplitReaderView({
   activeTabId,
   className,
-  onCloseSplit,
   onSelectSplitTab,
   onSourceChange,
   primaryTab,
@@ -1069,7 +1067,6 @@ function SplitReaderView({
 }: {
   activeTabId: string;
   className?: string;
-  onCloseSplit: () => void;
   onSelectSplitTab: (tabId: string) => void;
   onSourceChange: (tabId: string, content: string) => void;
   primaryTab: ReaderTab;
@@ -1095,7 +1092,6 @@ function SplitReaderView({
         <SplitReaderPane
           activeTabId={activeTabId}
           label="Second tab"
-          onCloseSplit={onCloseSplit}
           onSelectTab={onSelectSplitTab}
           onSourceChange={onSourceChange}
           selectableTabs={tabs}
@@ -1110,7 +1106,6 @@ function SplitReaderView({
 function SplitReaderPane({
   activeTabId,
   label,
-  onCloseSplit,
   onSelectTab,
   onSourceChange,
   selectableTabs,
@@ -1119,7 +1114,6 @@ function SplitReaderPane({
 }: {
   activeTabId?: string;
   label: string;
-  onCloseSplit?: () => void;
   onSelectTab?: (tabId: string) => void;
   onSourceChange: (tabId: string, content: string) => void;
   selectableTabs?: ReaderTab[];
@@ -1189,21 +1183,6 @@ function SplitReaderPane({
             </TabsTrigger>
           </TabsList>
         ) : null}
-
-        {onCloseSplit ? (
-          <Button
-            aria-label="Close split view"
-            className="shrink-0"
-            onClick={onCloseSplit}
-            size="icon"
-            type="button"
-            variant="ghost"
-          >
-            <PanelRightClose aria-hidden="true" />
-          </Button>
-        ) : (
-          <div className="size-9 shrink-0" aria-hidden="true" />
-        )}
       </div>
 
       {tab.error ? (
