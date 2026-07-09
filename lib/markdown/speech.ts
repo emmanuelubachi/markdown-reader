@@ -18,13 +18,19 @@ export function getReadableChunks(blocks: MarkdownBlock[]) {
   return getReadableSpeech(blocks).chunks;
 }
 
+// A speech chunk paired with the markdown source line of the smallest element
+// it came from (the <li>/<tr>/<p>/heading), used to sync the reading highlight.
+type ChunkPiece = { line: number; text: string };
+
 // Flattens blocks into speech chunks and, in the same pass, records the chunk
-// index at which each heading's section begins.
+// index at which each heading's section begins and the source line of each chunk.
 export function getReadableSpeech(blocks: MarkdownBlock[]): {
+  chunkLines: number[];
   chunks: string[];
   sections: SpeechSection[];
 } {
   const chunks: string[] = [];
+  const chunkLines: number[] = [];
   const sections: SpeechSection[] = [];
 
   for (const block of blocks) {
@@ -39,36 +45,46 @@ export function getReadableSpeech(blocks: MarkdownBlock[]): {
       });
     }
 
-    for (const chunk of blockChunks) {
-      chunks.push(chunk);
+    for (const piece of blockChunks) {
+      chunks.push(piece.text);
+      chunkLines.push(piece.line);
     }
   }
 
-  return { chunks, sections };
+  return { chunkLines, chunks, sections };
 }
 
-function getBlockChunks(block: MarkdownBlock): string[] {
+function getBlockChunks(block: MarkdownBlock): ChunkPiece[] {
   switch (block.type) {
     case "heading":
     case "paragraph":
-      return splitSpeechText(block.text);
+      return withLine(splitSpeechText(block.text), block.sourceLine);
     case "blockquote":
-      return splitSpeechText(`Quote. ${block.text}`);
+      return withLine(
+        splitSpeechText(`Quote. ${block.text}`),
+        block.sourceLine,
+      );
     case "list":
       return block.items.flatMap((item, index) =>
-        splitSpeechText(`Item ${index + 1}. ${item}`),
+        withLine(
+          splitSpeechText(`Item ${index + 1}. ${item}`),
+          block.itemLines[index] ?? block.sourceLine,
+        ),
       );
     case "table": {
       const headers = block.headers.map(toPlainSpeechText);
-      const rows =
+      const bodyRows =
         block.rows.length > 0
-          ? block.rows
+          ? block.rows.map((cells, index) => ({
+              cells,
+              line: block.rowLines[index] ?? block.sourceLine,
+            }))
           : block.headers.length > 0
-            ? [block.headers]
+            ? [{ cells: block.headers, line: block.headerLine }]
             : [];
 
-      return rows.flatMap((row) => {
-        const rowText = row
+      return bodyRows.flatMap(({ cells, line }) => {
+        const rowText = cells
           .map((cell, index) => {
             const text = toPlainSpeechText(cell);
             const header = headers[index];
@@ -82,13 +98,17 @@ function getBlockChunks(block: MarkdownBlock): string[] {
           .filter(Boolean)
           .join(". ");
 
-        return splitSpeechText(rowText);
+        return withLine(splitSpeechText(rowText), line);
       });
     }
     case "code":
     case "hr":
       return [];
   }
+}
+
+function withLine(texts: string[], line: number): ChunkPiece[] {
+  return texts.map((text) => ({ line, text }));
 }
 
 function splitSpeechText(text: string) {
