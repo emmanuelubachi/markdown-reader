@@ -33,6 +33,14 @@ type MarkdownElementProps<Tag extends keyof JSX.IntrinsicElements> =
     node?: unknown;
   };
 
+// The 1-based markdown source line of a rendered node, tagged onto block
+// elements as `data-source-line` so the read-aloud highlight can find them.
+function sourceLineOf(node: unknown): number | undefined {
+  const line = (node as MarkdownAstNode | undefined)?.position?.start?.line;
+
+  return typeof line === "number" ? line : undefined;
+}
+
 const markdownSanitizeSchema: RehypeSanitizeOptions = {
   ...defaultSchema,
   attributes: {
@@ -55,6 +63,7 @@ const markdownSanitizeSchema: RehypeSanitizeOptions = {
 
 const markdownComponents: Components = {
   a: MarkdownLink,
+  blockquote: MarkdownBlockquote,
   h1: MarkdownH1,
   h2: MarkdownH2,
   h3: MarkdownH3,
@@ -66,6 +75,7 @@ const markdownComponents: Components = {
   p: MarkdownParagraph,
   pre: MarkdownPre,
   table: MarkdownTable,
+  tr: MarkdownTableRow,
 };
 
 const markdownUrlTransform: UrlTransform = (value, key, _node) => {
@@ -82,14 +92,20 @@ const markdownUrlTransform: UrlTransform = (value, key, _node) => {
   return defaultUrlTransform(value);
 };
 
+// How long auto-follow scrolling backs off after the user scrolls manually.
+const USER_SCROLL_PAUSE_MS = 4000;
+
 export function MarkdownPreview({
+  activeSourceLine = null,
   content,
   onActiveHeadingChange,
 }: {
+  activeSourceLine?: number | null;
   content: string;
   onActiveHeadingChange: (headingId: string) => void;
 }) {
   const articleRef = useRef<HTMLElement>(null);
+  const userScrolledAtRef = useRef(0);
 
   useEffect(() => {
     const article = articleRef.current;
@@ -130,6 +146,67 @@ export function MarkdownPreview({
 
     return () => observer.disconnect();
   }, [content, onActiveHeadingChange]);
+
+  // Note manual scrolling so read-aloud auto-follow backs off briefly and
+  // doesn't yank the page back while the user is reading elsewhere.
+  useEffect(() => {
+    const article = articleRef.current;
+    const viewport = article?.closest("[data-slot='scroll-area-viewport']");
+
+    if (!viewport) {
+      return;
+    }
+
+    const markUserScroll = () => {
+      userScrolledAtRef.current = Date.now();
+    };
+
+    viewport.addEventListener("wheel", markUserScroll, { passive: true });
+    viewport.addEventListener("touchmove", markUserScroll, { passive: true });
+    viewport.addEventListener("keydown", markUserScroll);
+
+    return () => {
+      viewport.removeEventListener("wheel", markUserScroll);
+      viewport.removeEventListener("touchmove", markUserScroll);
+      viewport.removeEventListener("keydown", markUserScroll);
+    };
+  }, [content]);
+
+  // Highlight the passage being read aloud and keep it in view.
+  useEffect(() => {
+    const article = articleRef.current;
+
+    if (!article) {
+      return;
+    }
+
+    article.querySelector("[data-speaking]")?.removeAttribute("data-speaking");
+
+    if (activeSourceLine == null) {
+      return;
+    }
+
+    const target = article.querySelector<HTMLElement>(
+      `[data-source-line="${activeSourceLine}"]`,
+    );
+
+    if (!target) {
+      return;
+    }
+
+    target.setAttribute("data-speaking", "true");
+
+    if (Date.now() - userScrolledAtRef.current > USER_SCROLL_PAUSE_MS) {
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+      target.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "nearest",
+      });
+    }
+  }, [activeSourceLine, content]);
 
   if (!content.trim()) {
     return (
@@ -186,84 +263,96 @@ function MarkdownLink({
 }
 
 function MarkdownH1({
-  node: _node,
+  node,
   children,
   ...props
 }: MarkdownElementProps<"h1">) {
-  void _node;
-
   return (
-    <h1 {...props} data-markdown-heading={shouldTrackHeading(props)}>
+    <h1
+      {...props}
+      data-markdown-heading={shouldTrackHeading(props)}
+      data-source-line={sourceLineOf(node)}
+    >
       {children}
     </h1>
   );
 }
 
 function MarkdownH2({
-  node: _node,
+  node,
   children,
   ...props
 }: MarkdownElementProps<"h2">) {
-  void _node;
-
   return (
-    <h2 {...props} data-markdown-heading={shouldTrackHeading(props)}>
+    <h2
+      {...props}
+      data-markdown-heading={shouldTrackHeading(props)}
+      data-source-line={sourceLineOf(node)}
+    >
       {children}
     </h2>
   );
 }
 
 function MarkdownH3({
-  node: _node,
+  node,
   children,
   ...props
 }: MarkdownElementProps<"h3">) {
-  void _node;
-
   return (
-    <h3 {...props} data-markdown-heading={shouldTrackHeading(props)}>
+    <h3
+      {...props}
+      data-markdown-heading={shouldTrackHeading(props)}
+      data-source-line={sourceLineOf(node)}
+    >
       {children}
     </h3>
   );
 }
 
 function MarkdownH4({
-  node: _node,
+  node,
   children,
   ...props
 }: MarkdownElementProps<"h4">) {
-  void _node;
-
   return (
-    <h4 {...props} data-markdown-heading={shouldTrackHeading(props)}>
+    <h4
+      {...props}
+      data-markdown-heading={shouldTrackHeading(props)}
+      data-source-line={sourceLineOf(node)}
+    >
       {children}
     </h4>
   );
 }
 
 function MarkdownH5({
-  node: _node,
+  node,
   children,
   ...props
 }: MarkdownElementProps<"h5">) {
-  void _node;
-
   return (
-    <h5 {...props} data-markdown-heading={shouldTrackHeading(props)}>
+    <h5
+      {...props}
+      data-markdown-heading={shouldTrackHeading(props)}
+      data-source-line={sourceLineOf(node)}
+    >
       {children}
     </h5>
   );
 }
 
 function MarkdownH6({
-  node: _node,
+  node,
   children,
   ...props
 }: MarkdownElementProps<"h6">) {
-  void _node;
-
   return (
-    <h6 {...props} data-markdown-heading={shouldTrackHeading(props)}>
+    <h6
+      {...props}
+      data-markdown-heading={shouldTrackHeading(props)}
+      data-source-line={sourceLineOf(node)}
+    >
       {children}
     </h6>
   );
@@ -289,13 +378,11 @@ function MarkdownImage({
 }
 
 function MarkdownParagraph({
-  node: _node,
+  node,
   children,
   className,
   ...props
 }: MarkdownElementProps<"p">) {
-  void _node;
-
   const nextClassName = [
     className,
     containsImageChild(children) ? "badge-row" : null,
@@ -304,20 +391,22 @@ function MarkdownParagraph({
     .join(" ");
 
   return (
-    <p {...props} className={nextClassName || undefined}>
+    <p
+      {...props}
+      className={nextClassName || undefined}
+      data-source-line={sourceLineOf(node)}
+    >
       {children}
     </p>
   );
 }
 
 function MarkdownListItem({
-  node: _node,
+  node,
   children,
   className,
   ...props
 }: MarkdownElementProps<"li">) {
-  void _node;
-
   const nextClassName = [
     className,
     containsElementChild(children, "input") ? "task-list-item" : null,
@@ -326,9 +415,37 @@ function MarkdownListItem({
     .join(" ");
 
   return (
-    <li {...props} className={nextClassName || undefined}>
+    <li
+      {...props}
+      className={nextClassName || undefined}
+      data-source-line={sourceLineOf(node)}
+    >
       {children}
     </li>
+  );
+}
+
+function MarkdownBlockquote({
+  node,
+  children,
+  ...props
+}: MarkdownElementProps<"blockquote">) {
+  return (
+    <blockquote {...props} data-source-line={sourceLineOf(node)}>
+      {children}
+    </blockquote>
+  );
+}
+
+function MarkdownTableRow({
+  node,
+  children,
+  ...props
+}: MarkdownElementProps<"tr">) {
+  return (
+    <tr {...props} data-source-line={sourceLineOf(node)}>
+      {children}
+    </tr>
   );
 }
 

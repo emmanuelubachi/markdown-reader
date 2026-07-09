@@ -1,4 +1,8 @@
-export type MarkdownBlock =
+// `sourceLine` is the 1-based markdown line each block starts on — a stable key
+// shared with the react-markdown-rendered DOM (same remark parser), used to sync
+// the read-aloud highlight. Lists/tables also carry per-item/per-row lines so the
+// highlight can target the specific <li>/<tr> being read.
+export type MarkdownBlock = { sourceLine: number } & (
   | {
       id: string;
       level: number;
@@ -12,6 +16,7 @@ export type MarkdownBlock =
   | {
       ordered: boolean;
       items: string[];
+      itemLines: number[];
       type: "list";
     }
   | {
@@ -27,10 +32,13 @@ export type MarkdownBlock =
       type: "hr";
     }
   | {
+      headerLine: number;
       headers: string[];
+      rowLines: number[];
       rows: string[][];
       type: "table";
-    };
+    }
+);
 
 export type HeadingBlock = Extract<MarkdownBlock, { type: "heading" }>;
 
