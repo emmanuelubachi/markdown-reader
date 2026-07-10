@@ -10,6 +10,7 @@ export type MarkdownAstNode = {
   identifier?: string;
   lang?: string | null;
   ordered?: boolean | null;
+  position?: { start?: { line?: number } };
   title?: string | null;
   type: string;
   url?: string;

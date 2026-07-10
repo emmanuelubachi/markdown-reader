@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ClipboardPaste,
   Columns2,
+  Download,
   FileText,
   PanelRightClose,
   Search,
@@ -48,6 +49,7 @@ import {
 import {
   createLoadedReaderTab,
   createReaderTab,
+  getDownloadFileName,
   getPastedDocumentName,
   getReaderTabLabel,
   isEditablePasteTarget,
@@ -67,7 +69,10 @@ import {
   type SpeechSection,
 } from "@/lib/markdown/speech";
 import { getDocumentStats } from "@/lib/markdown/stats";
-import { useReadAloud } from "@/hooks/use-read-aloud";
+import {
+  useReadAloud,
+  type ReadAloudController,
+} from "@/hooks/use-read-aloud";
 import type {
   DocumentStats,
   HeadingBlock,
@@ -83,6 +88,7 @@ type ReaderTabModel = {
   headings: HeadingBlock[];
   outlineActiveHeadingId: null | string;
   readAloudChunks: string[];
+  readAloudChunkLines: number[];
   readAloudSections: SpeechSection[];
   stats: DocumentStats;
 };
@@ -616,6 +622,28 @@ export function MarkdownReader() {
     return Array.from(event.dataTransfer?.types ?? []).includes("Files");
   }
 
+  // Save the active document (including any source edits) to the user's device
+  // as a .md file — a client-side Blob download, nothing leaves the browser.
+  function downloadDocument() {
+    if (!file) {
+      return;
+    }
+
+    const blob = new Blob([file.content], {
+      type: "text/markdown;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+
+    anchor.download = getDownloadFileName(file.name);
+    anchor.href = url;
+    anchor.rel = "noopener";
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   function handleDragEnter(event: DragEvent<HTMLElement>) {
     if (!dragHasFiles(event)) {
       return;
@@ -956,6 +984,16 @@ export function MarkdownReader() {
                 >
                   <ClipboardPaste aria-hidden="true" />
                 </Button>
+                <Button
+                  aria-label="Download this Markdown file"
+                  onClick={downloadDocument}
+                  size="icon"
+                  title="Download .md"
+                  type="button"
+                  variant="secondary"
+                >
+                  <Download aria-hidden="true" />
+                </Button>
               </div>
             ) : null}
 
@@ -1001,6 +1039,7 @@ export function MarkdownReader() {
                 onSelectSplitTab={setSplitTabId}
                 onSourceChange={editTabContent}
                 primaryTab={activeTab}
+                reader={reader}
                 secondaryTab={splitTab}
                 tabs={readerState.tabs}
                 updateTab={updateTab}
@@ -1015,6 +1054,7 @@ export function MarkdownReader() {
                 onOpenPaste={() => setIsPasteDialogOpen(true)}
                 onReset={resetReader}
                 onSourceChange={editTabContent}
+                reader={reader}
                 updateTab={updateTab}
               />
             </>
@@ -1029,6 +1069,7 @@ export function MarkdownReader() {
               onOpenPaste={() => setIsPasteDialogOpen(true)}
               onReset={resetReader}
               onSourceChange={editTabContent}
+              reader={reader}
               updateTab={updateTab}
             />
           )}
@@ -1062,6 +1103,29 @@ function getReaderPersistenceSignature(state: ReaderState) {
   return [state.activeTabId, ...tabSignatures].join("\u0002");
 }
 
+// The markdown source line of the passage currently being read aloud in `tab`,
+// or null when this tab isn't the one that owns playback. Gated on sourceTabId +
+// status (never the index value) so the index-0 reset doesn't false-highlight.
+function getSpeakingLine(
+  reader: ReadAloudController,
+  tabId: string,
+  chunkLines: number[],
+): number | null {
+  if (reader.sourceTabId !== tabId) {
+    return null;
+  }
+
+  if (
+    reader.status !== "playing" &&
+    reader.status !== "paused" &&
+    reader.status !== "loading"
+  ) {
+    return null;
+  }
+
+  return chunkLines[reader.currentIndex] ?? null;
+}
+
 function useReaderTabModel(tab: ReaderTab | null): ReaderTabModel {
   const content = tab?.file?.content ?? "";
   const activeHeadingId = tab?.activeHeadingId ?? null;
@@ -1071,10 +1135,11 @@ function useReaderTabModel(tab: ReaderTab | null): ReaderTabModel {
     () => blocks.filter((block) => block.type === "heading"),
     [blocks],
   );
-  const { chunks: readAloudChunks, sections: readAloudSections } = useMemo(
-    () => getReadableSpeech(blocks),
-    [blocks],
-  );
+  const {
+    chunkLines: readAloudChunkLines,
+    chunks: readAloudChunks,
+    sections: readAloudSections,
+  } = useMemo(() => getReadableSpeech(blocks), [blocks]);
   const outlineActiveHeadingId = useMemo(() => {
     if (
       activeHeadingId &&
@@ -1091,6 +1156,7 @@ function useReaderTabModel(tab: ReaderTab | null): ReaderTabModel {
     headings,
     outlineActiveHeadingId,
     readAloudChunks,
+    readAloudChunkLines,
     readAloudSections,
     stats,
   };
@@ -1106,6 +1172,7 @@ function SingleReaderView({
   onOpenPaste,
   onReset,
   onSourceChange,
+  reader,
   updateTab,
 }: {
   activeModel: ReaderTabModel;
@@ -1117,6 +1184,7 @@ function SingleReaderView({
   onOpenPaste: () => void;
   onReset: () => void;
   onSourceChange: (tabId: string, content: string) => void;
+  reader: ReadAloudController;
   updateTab: (tabId: string, updates: Partial<ReaderTab>) => void;
 }) {
   const file = activeTab.file;
@@ -1163,6 +1231,11 @@ function SingleReaderView({
             >
               {file ? (
                 <MarkdownPreview
+                  activeSourceLine={getSpeakingLine(
+                    reader,
+                    activeTab.id,
+                    activeModel.readAloudChunkLines,
+                  )}
                   content={file.content}
                   onActiveHeadingChange={(headingId) =>
                     updateTab(activeTab.id, { activeHeadingId: headingId })
@@ -1211,6 +1284,7 @@ function SplitReaderView({
   onSelectSplitTab,
   onSourceChange,
   primaryTab,
+  reader,
   secondaryTab,
   tabs,
   updateTab,
@@ -1220,6 +1294,7 @@ function SplitReaderView({
   onSelectSplitTab: (tabId: string) => void;
   onSourceChange: (tabId: string, content: string) => void;
   primaryTab: ReaderTab;
+  reader: ReadAloudController;
   secondaryTab: ReaderTab;
   tabs: ReaderTab[];
   updateTab: (tabId: string, updates: Partial<ReaderTab>) => void;
@@ -1233,6 +1308,7 @@ function SplitReaderView({
         <SplitReaderPane
           label="Active tab"
           onSourceChange={onSourceChange}
+          reader={reader}
           tab={primaryTab}
           updateTab={updateTab}
         />
@@ -1244,6 +1320,7 @@ function SplitReaderView({
           label="Second tab"
           onSelectTab={onSelectSplitTab}
           onSourceChange={onSourceChange}
+          reader={reader}
           selectableTabs={tabs}
           tab={secondaryTab}
           updateTab={updateTab}
@@ -1258,6 +1335,7 @@ function SplitReaderPane({
   label,
   onSelectTab,
   onSourceChange,
+  reader,
   selectableTabs,
   tab,
   updateTab,
@@ -1266,11 +1344,13 @@ function SplitReaderPane({
   label: string;
   onSelectTab?: (tabId: string) => void;
   onSourceChange: (tabId: string, content: string) => void;
+  reader: ReadAloudController;
   selectableTabs?: ReaderTab[];
   tab: ReaderTab;
   updateTab: (tabId: string, updates: Partial<ReaderTab>) => void;
 }) {
   const file = tab.file;
+  const model = useReaderTabModel(tab);
 
   return (
     <Tabs
@@ -1359,6 +1439,11 @@ function SplitReaderPane({
           >
             {file ? (
               <MarkdownPreview
+                activeSourceLine={getSpeakingLine(
+                  reader,
+                  tab.id,
+                  model.readAloudChunkLines,
+                )}
                 content={file.content}
                 onActiveHeadingChange={(headingId) =>
                   updateTab(tab.id, { activeHeadingId: headingId })

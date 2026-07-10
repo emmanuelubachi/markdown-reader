@@ -33,6 +33,8 @@ function getMarkdownBlocks(
   node: MarkdownAstNode,
   slugHeading: MarkdownSlugger,
 ): MarkdownBlock[] {
+  const sourceLine = getNodeLine(node);
+
   switch (node.type) {
     case "heading": {
       const text = getMarkdownNodeText(node);
@@ -45,6 +47,7 @@ function getMarkdownBlocks(
         {
           id: `${MARKDOWN_HEADING_ID_PREFIX}${slugHeading(text)}`,
           level: clampHeadingLevel(node.depth),
+          sourceLine,
           text,
           type: "heading",
         },
@@ -53,23 +56,24 @@ function getMarkdownBlocks(
     case "paragraph": {
       const text = getMarkdownNodeText(node);
 
-      return text ? [{ text, type: "paragraph" }] : [];
+      return text ? [{ sourceLine, text, type: "paragraph" }] : [];
     }
     case "blockquote": {
       const text = getMarkdownNodesText(node.children);
 
-      return text ? [{ text, type: "blockquote" }] : [];
+      return text ? [{ sourceLine, text, type: "blockquote" }] : [];
     }
     case "code":
       return [
         {
           code: node.value ?? "",
           language: node.lang ?? "",
+          sourceLine,
           type: "code",
         },
       ];
     case "thematicBreak":
-      return [{ type: "hr" }];
+      return [{ sourceLine, type: "hr" }];
     case "list":
       return getListBlock(node);
     case "table":
@@ -77,7 +81,7 @@ function getMarkdownBlocks(
     case "html": {
       const text = getMarkdownNodeText(node);
 
-      return text ? [{ text, type: "paragraph" }] : [];
+      return text ? [{ sourceLine, text, type: "paragraph" }] : [];
     }
     case "footnoteDefinition": {
       const text = getMarkdownNodesText(node.children);
@@ -88,6 +92,7 @@ function getMarkdownBlocks(
 
       return [
         {
+          sourceLine,
           text: `Footnote ${node.identifier ?? ""}. ${text}`.trim(),
           type: "paragraph",
         },
@@ -101,19 +106,23 @@ function getMarkdownBlocks(
 }
 
 function getListBlock(node: MarkdownAstNode): MarkdownBlock[] {
-  const items = (node.children ?? [])
+  // Keep each item's text and source line together, then drop empties, so
+  // `items` and `itemLines` stay index-aligned.
+  const entries = (node.children ?? [])
     .filter((child) => child.type === "listItem")
-    .map(getListItemText)
-    .filter(Boolean);
+    .map((item) => ({ line: getNodeLine(item), text: getListItemText(item) }))
+    .filter((entry) => entry.text);
 
-  if (items.length === 0) {
+  if (entries.length === 0) {
     return [];
   }
 
   return [
     {
-      items,
+      itemLines: entries.map((entry) => entry.line),
+      items: entries.map((entry) => entry.text),
       ordered: Boolean(node.ordered),
+      sourceLine: getNodeLine(node),
       type: "list",
     },
   ];
@@ -140,25 +149,33 @@ function getListItemText(item: MarkdownAstNode) {
 function getTableBlock(node: MarkdownAstNode): MarkdownBlock[] {
   const rows = (node.children ?? [])
     .filter((child) => child.type === "tableRow")
-    .map((row) =>
-      (row.children ?? [])
+    .map((row) => ({
+      cells: (row.children ?? [])
         .filter((cell) => cell.type === "tableCell")
         .map((cell) => getMarkdownNodeText(cell)),
-    )
-    .filter((row) => row.length > 0);
-  const [headers, ...bodyRows] = rows;
+      line: getNodeLine(row),
+    }))
+    .filter((row) => row.cells.length > 0);
+  const [headerRow, ...bodyRows] = rows;
 
-  if (!headers || headers.length === 0) {
+  if (!headerRow || headerRow.cells.length === 0) {
     return [];
   }
 
   return [
     {
-      headers,
-      rows: bodyRows,
+      headerLine: headerRow.line,
+      headers: headerRow.cells,
+      rowLines: bodyRows.map((row) => row.line),
+      rows: bodyRows.map((row) => row.cells),
+      sourceLine: getNodeLine(node),
       type: "table",
     },
   ];
+}
+
+function getNodeLine(node: MarkdownAstNode): number {
+  return node.position?.start?.line ?? 0;
 }
 
 function clampHeadingLevel(depth: number | undefined) {
