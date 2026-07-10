@@ -1,6 +1,6 @@
 "use client";
 
-import type { ForwardedRef } from "react";
+import type { ForwardedRef, ReactNode } from "react";
 import {
   BlockTypeSelect,
   BoldItalicUnderlineToggles,
@@ -13,7 +13,6 @@ import {
   InsertThematicBreak,
   ListsToggle,
   MDXEditor,
-  Separator,
   StrikeThroughSupSubToggles,
   UndoRedo,
   codeBlockPlugin,
@@ -43,6 +42,20 @@ export type InitializedMarkdownEditorProps = {
 };
 
 const BLOCKED_IMAGE_PREVIEW = "/assets/remote-image-blocked.svg";
+
+function ToolbarGroup({
+  children,
+  label,
+}: {
+  children: ReactNode;
+  label: string;
+}) {
+  return (
+    <div aria-label={label} className="reader-markdown-toolbar-group" role="group">
+      {children}
+    </div>
+  );
+}
 
 export default function InitializedMarkdownEditor({
   editorRef,
@@ -102,29 +115,41 @@ export default function InitializedMarkdownEditor({
               options={[
                 {
                   when: (editor) => editor?.editorType === "codeblock",
-                  contents: () => <ChangeCodeMirrorLanguage />,
+                  contents: () => (
+                    <ToolbarGroup label="Code block language">
+                      <ChangeCodeMirrorLanguage />
+                    </ToolbarGroup>
+                  ),
                 },
                 {
                   fallback: () => (
-                    <>
-                      <UndoRedo />
-                      <Separator />
-                      <BlockTypeSelect />
-                      <BoldItalicUnderlineToggles
-                        options={["Bold", "Italic"]}
-                      />
-                      <CodeToggle />
-                      <StrikeThroughSupSubToggles
-                        options={["Strikethrough"]}
-                      />
-                      <Separator />
-                      <ListsToggle />
-                      <CreateLink />
-                      <Separator />
-                      <InsertTable />
-                      <InsertCodeBlock />
-                      <InsertThematicBreak />
-                    </>
+                    <div className="reader-markdown-toolbar-groups">
+                      <ToolbarGroup label="History">
+                        <UndoRedo />
+                      </ToolbarGroup>
+
+                      <ToolbarGroup label="Text style">
+                        <BlockTypeSelect />
+                        <BoldItalicUnderlineToggles
+                          options={["Bold", "Italic"]}
+                        />
+                        <CodeToggle />
+                        <StrikeThroughSupSubToggles
+                          options={["Strikethrough"]}
+                        />
+                      </ToolbarGroup>
+
+                      <ToolbarGroup label="Lists">
+                        <ListsToggle />
+                      </ToolbarGroup>
+
+                      <ToolbarGroup label="Insert">
+                        <CreateLink />
+                        <InsertTable />
+                        <InsertCodeBlock />
+                        <InsertThematicBreak />
+                      </ToolbarGroup>
+                    </div>
                   ),
                 },
               ]}
