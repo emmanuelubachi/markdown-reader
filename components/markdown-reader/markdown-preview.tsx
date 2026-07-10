@@ -369,7 +369,14 @@ function MarkdownImage({
   const safeSrc = typeof src === "string" ? sanitizeImageSrc(src) : null;
 
   if (!safeSrc) {
-    return <span className="image-fallback">{alt || "Image blocked"}</span>;
+    return (
+      <span
+        className="image-fallback"
+        title="Remote images are blocked to keep this document local"
+      >
+        {alt || "Remote image blocked"}
+      </span>
+    );
   }
 
   // Markdown image dimensions are user-authored, so Next Image cannot know them here.

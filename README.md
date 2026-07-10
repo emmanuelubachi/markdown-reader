@@ -34,9 +34,11 @@
 - 🔊 **Read aloud** — text-to-speech playback with play/pause, stop, and adjustable speed.
 - 📊 **Document stats** — live word count, line count, and estimated reading time.
 - 🌗 **Light & dark themes** — system-aware with a manual toggle.
-- 🔒 **Fully local** — parsing and rendering happen in the browser; nothing is sent to a server.
+- 🔒 **Fully local documents** — parsing, rendering, persistence, and read-aloud generation happen in the browser; document content is never uploaded.
 
-Markdown is rendered with [react-markdown](https://github.com/remarkjs/react-markdown) using [remark-gfm](https://github.com/remarkjs/remark-gfm) for GitHub-flavored markdown (tables, task lists, strikethrough) and [rehype-sanitize](https://github.com/rehypejs/rehype-sanitize) plus custom URL/image sanitization for safe rendering of links and images.
+Markdown is rendered with [react-markdown](https://github.com/remarkjs/react-markdown) using [remark-gfm](https://github.com/remarkjs/remark-gfm) for GitHub-flavored markdown (tables, task lists, strikethrough) and [rehype-sanitize](https://github.com/rehypejs/rehype-sanitize) plus custom URL/image sanitization. Remote images are blocked by default so opening an untrusted document cannot contact hosts named inside it; self-contained raster `data:` images remain supported.
+
+The optional natural read-aloud voice runs on-device after downloading its model on first use. That download does not include document content.
 
 ## Tech Stack
 

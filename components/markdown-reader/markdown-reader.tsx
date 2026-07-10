@@ -54,6 +54,7 @@ import {
   getReaderTabLabel,
   isEditablePasteTarget,
   isMarkdownFile,
+  placeLoadedFileInReaderState,
 } from "@/lib/markdown/document";
 import { parseMarkdown } from "@/lib/markdown/parse";
 import {
@@ -392,20 +393,11 @@ export function MarkdownReader() {
     );
   }
 
-  function loadTabContent(tabId: string, nextFile: LoadedFile) {
-    updateTab(
-      tabId,
-      {
-        activeHeadingId: null,
-        error: null,
-        file: nextFile,
-        view: "preview",
-      },
-      { persistImmediately: true },
-    );
-  }
-
   function editTabContent(tabId: string, content: string) {
+    if (reader.sourceTabId === tabId) {
+      reader.stop();
+    }
+
     const size = new Blob([content]).size;
     const currentState = getCurrentReaderState();
 
@@ -603,13 +595,20 @@ export function MarkdownReader() {
       return false;
     }
 
-    loadTabContent(tabId, {
+    const nextFile: LoadedFile = {
       content,
       lastModified: Date.now(),
       name: getPastedDocumentName(content),
       size,
       source: "paste",
-    });
+    };
+    const nextState = placeLoadedFileInReaderState(
+      getCurrentReaderState(),
+      nextFile,
+      tabId,
+    );
+
+    commitReaderState(nextState, { persistImmediately: true });
 
     return true;
   }
@@ -690,6 +689,10 @@ export function MarkdownReader() {
   }
 
   function resetReader() {
+    if (reader.sourceTabId === activeTab.id) {
+      reader.stop();
+    }
+
     updateTab(
       activeTab.id,
       {
@@ -716,6 +719,7 @@ export function MarkdownReader() {
   }
 
   async function handleClearReaderSession() {
+    reader.stop();
     setSplitTabId(null);
 
     const freshTab = createReaderTab();
@@ -1013,6 +1017,18 @@ export function MarkdownReader() {
               ) : null}
             </TabsList>
           </div>
+
+          {file ? (
+            <ReadAloudToolbar
+              activeTabId={activeTab.id}
+              chunks={activeModel.readAloudChunks}
+              className="flex min-w-0 rounded-none border-x-0 border-b-0 px-2 sm:hidden"
+              controlIdPrefix="mobile-read-aloud"
+              onSelectSourceTab={selectTab}
+              reader={reader}
+              sections={activeModel.readAloudSections}
+            />
+          ) : null}
         </div>
 
         <input
