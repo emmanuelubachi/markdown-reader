@@ -1,6 +1,6 @@
 allowBuilds:
-  onnxruntime-node: set this to true or false
-  protobufjs: set this to true or false
+  onnxruntime-node: false
+  protobufjs: false
   sharp: false
   unrs-resolver: false
 ignoredBuiltDependencies:
@@ -11,3 +11,5 @@ minimumReleaseAgeExclude:
   - caniuse-lite@1.0.30001802
   - hono@4.12.28
   - yocto-spinner@1.2.1
+overrides:
+  next>postcss: 8.5.16

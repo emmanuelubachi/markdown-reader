@@ -6,14 +6,14 @@ These are the main implementation watchouts to keep visible as the reader grows.
 
 Baseline implemented: preview now renders through `react-markdown` with `remark-gfm`, `rehype-raw`, and `rehype-sanitize`, while outline/read-aloud metadata comes from a `unified` + `remark-gfm` AST pass. Keep testing against real-world markdown before positioning the app as an "open any markdown" reader, especially around unusual raw HTML, local image paths, math/diagrams, syntax highlighting, and very large documents.
 
-## Mobile Read Aloud
+## Remote Markdown Resources
 
-The read-aloud toolbar is currently optimized for the desktop chrome. Keep the feature reachable on small screens, either through a compact mobile toolbar, a bottom action bar, or a document action menu.
+Remote images are blocked by default to preserve the reader's local-only trust boundary. If remote media support is added later, require an explicit per-document user action and avoid silently loading URLs embedded in untrusted markdown.
 
 ## Reader Tab State Complexity
 
 The main reader shell still owns tab mutations directly. If the app adds persistence, tab renaming, recents, saved sessions, split panes, or synced selections, move tab state into a dedicated reducer or hook before the component becomes hard to reason about.
 
-## Project Documentation
+## Read Aloud Lifecycle
 
-The README still reads like the default Next.js scaffold. Replace it with product-specific setup, feature, architecture, and local-only/privacy notes so future implementation passes have a stable handoff point.
+Playback must stop whenever its source document is edited, removed, closed, or cleared from the saved session. Keep both desktop and mobile controls wired to the same lifted reader controller.

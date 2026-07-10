@@ -1,5 +1,9 @@
 import { toPlainSpeechText } from "@/lib/markdown/speech";
-import type { LoadedFile, ReaderTab } from "@/lib/markdown/types";
+import type {
+  LoadedFile,
+  ReaderState,
+  ReaderTab,
+} from "@/lib/markdown/types";
 
 export function isMarkdownFile(file: File) {
   const normalizedName = file.name.toLowerCase();
@@ -43,6 +47,41 @@ export function createLoadedReaderTab(file: LoadedFile): ReaderTab {
     file,
     id: createDocumentId(),
     view: "preview",
+  };
+}
+
+// Place imported text into an empty target tab, but never overwrite a document
+// that is already open. This keeps app-level paste convenient without turning a
+// stray Cmd/Ctrl+V into a destructive action.
+export function placeLoadedFileInReaderState(
+  state: ReaderState,
+  file: LoadedFile,
+  targetTabId: string,
+): ReaderState {
+  const targetTab = state.tabs.find((tab) => tab.id === targetTabId);
+
+  if (targetTab && !targetTab.file) {
+    return {
+      activeTabId: targetTab.id,
+      tabs: state.tabs.map((tab) =>
+        tab.id === targetTab.id
+          ? {
+              ...tab,
+              activeHeadingId: null,
+              error: null,
+              file,
+              view: "preview",
+            }
+          : tab,
+      ),
+    };
+  }
+
+  const nextTab = createLoadedReaderTab(file);
+
+  return {
+    activeTabId: nextTab.id,
+    tabs: [...state.tabs, nextTab],
   };
 }
 

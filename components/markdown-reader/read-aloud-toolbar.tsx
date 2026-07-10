@@ -56,6 +56,7 @@ export function ReadAloudToolbar({
   activeTabId,
   onSelectSourceTab,
   className,
+  controlIdPrefix = "read-aloud",
 }: {
   reader: ReadAloudController;
   chunks: string[];
@@ -63,7 +64,11 @@ export function ReadAloudToolbar({
   activeTabId: string;
   onSelectSourceTab: (tabId: string) => void;
   className?: string;
+  controlIdPrefix?: string;
 }) {
+  const engineControlId = `${controlIdPrefix}-engine`;
+  const rateControlId = `${controlIdPrefix}-rate`;
+  const voiceControlId = `${controlIdPrefix}-voice`;
   const hasReadableText = chunks.length > 0;
   // The single lifted player may be reading a different tab's document. This
   // toolbar only reflects playback that belongs to the tab currently on screen.
@@ -371,7 +376,7 @@ export function ReadAloudToolbar({
       <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
         <label
           className="text-xs font-medium text-muted-foreground"
-          htmlFor="read-aloud-rate"
+          htmlFor={rateControlId}
         >
           Speed
         </label>
@@ -379,7 +384,7 @@ export function ReadAloudToolbar({
           aria-label="Reading speed"
           className="h-1.5 w-20 accent-[#03444A] dark:accent-[#58D1E2]"
           disabled={!canRead}
-          id="read-aloud-rate"
+          id={rateControlId}
           max="1.5"
           min="0.75"
           onChange={(event) =>
@@ -460,13 +465,13 @@ export function ReadAloudToolbar({
           <div className="flex flex-col gap-1.5">
             <label
               className="text-xs font-medium text-muted-foreground"
-              htmlFor="read-aloud-engine"
+              htmlFor={engineControlId}
             >
               Engine
             </label>
             <NativeSelect
               className="w-full"
-              id="read-aloud-engine"
+              id={engineControlId}
               onChange={(event) =>
                 reader.setEngine(
                   event.currentTarget.value === "natural"
@@ -495,14 +500,14 @@ export function ReadAloudToolbar({
           <div className="flex flex-col gap-1.5">
             <label
               className="text-xs font-medium text-muted-foreground"
-              htmlFor="read-aloud-voice"
+              htmlFor={voiceControlId}
             >
               Voice
             </label>
             {reader.engine === "device" ? (
               <NativeSelect
                 className="w-full"
-                id="read-aloud-voice"
+                id={voiceControlId}
                 onChange={(event) =>
                   reader.setDeviceVoiceURI(event.currentTarget.value || null)
                 }
@@ -525,7 +530,7 @@ export function ReadAloudToolbar({
             ) : (
               <NativeSelect
                 className="w-full"
-                id="read-aloud-voice"
+                id={voiceControlId}
                 onChange={(event) => {
                   const voice = KOKORO_VOICES.find(
                     (candidate) => candidate.id === event.currentTarget.value,

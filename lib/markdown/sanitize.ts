@@ -30,14 +30,10 @@ export function sanitizeImageSrc(rawSrc: string) {
     return null;
   }
 
-  try {
-    const url = new URL(src);
-    const isRemoteImage = ["http:", "https:"].includes(url.protocol);
-    const isInlineImage =
-      url.protocol === "data:" && src.toLowerCase().startsWith("data:image/");
-
-    return isRemoteImage || isInlineImage ? src : null;
-  } catch {
-    return null;
-  }
+  // The reader promises that opening a document does not contact hosts named by
+  // that document. Keep images self-contained and restrict inline data to
+  // raster formats; SVG can reference external resources of its own.
+  return /^data:image\/(?:avif|gif|jpe?g|png|webp)(?:;[^,]*)?,/i.test(src)
+    ? src
+    : null;
 }
