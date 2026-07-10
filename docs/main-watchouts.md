@@ -4,7 +4,7 @@ These are the main implementation watchouts to keep visible as the reader grows.
 
 ## Markdown Fidelity
 
-Baseline implemented: preview now renders through `react-markdown` with `remark-gfm`, `rehype-raw`, and `rehype-sanitize`, while outline/read-aloud metadata comes from a `unified` + `remark-gfm` AST pass. Keep testing against real-world markdown before positioning the app as an "open any markdown" reader, especially around unusual raw HTML, local image paths, math/diagrams, syntax highlighting, and very large documents.
+Baseline implemented: read-only preview renders through `react-markdown` with `remark-gfm`, `rehype-raw`, and `rehype-sanitize`; rich editing uses client-only MDXEditor with Markdown-native AST conversion; outline/read-aloud metadata comes from a `unified` + `remark-gfm` AST pass. Unsupported HTML/MDX stays editable through Source view rather than being rendered unsafely in the rich editor. Keep testing against real-world markdown, especially around local image paths, math/diagrams, syntax highlighting, and very large documents.
 
 ## Remote Markdown Resources
 

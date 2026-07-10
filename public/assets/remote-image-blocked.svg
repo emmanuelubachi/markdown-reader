@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-labelledby="title description">
+  <title id="title">Remote image blocked</title>
+  <desc id="description">A placeholder shown when a Markdown document references a remote image.</desc>
+  <rect width="640" height="360" rx="24" fill="#e8edef"/>
+  <path d="M229 242h182a18 18 0 0 0 16-26l-42-82a18 18 0 0 0-30-3l-42 54-25-28a18 18 0 0 0-28 2l-47 57a18 18 0 0 0 16 26Z" fill="#8ea8ac"/>
+  <circle cx="263" cy="121" r="24" fill="#58d1e2"/>
+  <path d="m219 84 202 202M421 84 219 286" fill="none" stroke="#03444a" stroke-linecap="round" stroke-width="18"/>
+</svg>

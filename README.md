@@ -30,6 +30,7 @@
 - 🗂️ **Tabbed documents** — open multiple markdown files at once, browser-style.
 - 📥 **Multiple inputs** — choose a file, drag & drop anywhere, or paste markdown (dialog or ⌘/Ctrl + V).
 - 👀 **Preview & Source** — toggle between the rendered view and the raw markdown.
+- ✍️ **Editable preview** — switch the rendered preview into a Markdown-native rich editor with formatting controls.
 - 🧭 **Outline navigation** — auto-generated heading outline with active-heading tracking as you scroll.
 - 🔊 **Read aloud** — text-to-speech playback with play/pause, stop, and adjustable speed.
 - 📊 **Document stats** — live word count, line count, and estimated reading time.
