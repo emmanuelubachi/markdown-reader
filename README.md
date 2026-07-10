@@ -37,7 +37,7 @@
 - 🌗 **Light & dark themes** — system-aware with a manual toggle.
 - 🔒 **Fully local documents** — parsing, rendering, persistence, and read-aloud generation happen in the browser; document content is never uploaded.
 
-Markdown is rendered with [react-markdown](https://github.com/remarkjs/react-markdown) using [remark-gfm](https://github.com/remarkjs/remark-gfm) for GitHub-flavored markdown (tables, task lists, strikethrough) and [rehype-sanitize](https://github.com/rehypejs/rehype-sanitize) plus custom URL/image sanitization. Remote images are blocked by default so opening an untrusted document cannot contact hosts named inside it; self-contained raster `data:` images remain supported.
+Markdown is rendered with [react-markdown](https://github.com/remarkjs/react-markdown) using [remark-gfm](https://github.com/remarkjs/remark-gfm) for GitHub-flavored markdown (tables, task lists, strikethrough) and [rehype-sanitize](https://github.com/rehypejs/rehype-sanitize) plus custom URL/image sanitization. HTTP(S) images referenced by a document are fetched directly by the browser, while unsafe URL schemes remain blocked. The Markdown file and its content are not uploaded or sent to the app server.
 
 The optional natural read-aloud voice runs on-device after downloading its model on first use. That download does not include document content.
 
