@@ -370,11 +370,8 @@ function MarkdownImage({
 
   if (!safeSrc) {
     return (
-      <span
-        className="image-fallback"
-        title="Remote images are blocked to keep this document local"
-      >
-        {alt || "Remote image blocked"}
+      <span className="image-fallback" title="This image URL is not allowed">
+        {alt || "Image unavailable"}
       </span>
     );
   }

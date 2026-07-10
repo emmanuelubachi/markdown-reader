@@ -17,9 +17,20 @@ describe("sanitizeHref", () => {
 });
 
 describe("sanitizeImageSrc", () => {
-  it("blocks remote and potentially networked image sources", () => {
-    expect(sanitizeImageSrc("https://tracker.example/pixel.png")).toBeNull();
-    expect(sanitizeImageSrc("http://127.0.0.1:4178/action")).toBeNull();
+  it("allows absolute HTTP(S) image sources", () => {
+    expect(sanitizeImageSrc("https://example.com/image.png")).toBe(
+      "https://example.com/image.png",
+    );
+    expect(sanitizeImageSrc("http://127.0.0.1:4178/image.png")).toBe(
+      "http://127.0.0.1:4178/image.png",
+    );
+  });
+
+  it("blocks unsafe, local, and potentially executable image sources", () => {
+    expect(sanitizeImageSrc("javascript:alert(1)")).toBeNull();
+    expect(sanitizeImageSrc("file:///etc/passwd")).toBeNull();
+    expect(sanitizeImageSrc("//example.com/image.png")).toBeNull();
+    expect(sanitizeImageSrc("./local-image.png")).toBeNull();
     expect(
       sanitizeImageSrc("data:image/svg+xml,<svg></svg>"),
     ).toBeNull();
