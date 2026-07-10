@@ -13,12 +13,14 @@ import {
   AlertCircle,
   BookOpen,
   Braces,
+  Check,
   ChevronDown,
   ClipboardPaste,
   Columns2,
   Download,
   FileText,
   PanelRightClose,
+  PencilLine,
   Search,
   Upload,
 } from "lucide-react";
@@ -138,6 +140,26 @@ export function MarkdownReader() {
   const documentView = activeTab.view;
   const canUseSplitView = readerState.tabs.length >= 2;
   const [splitTabId, setSplitTabId] = useState<null | string>(null);
+  const [editingTabIds, setEditingTabIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const setTabEditing = useCallback((tabId: string, isEditing: boolean) => {
+    setEditingTabIds((currentTabIds) => {
+      if (currentTabIds.has(tabId) === isEditing) {
+        return currentTabIds;
+      }
+
+      const nextTabIds = new Set(currentTabIds);
+
+      if (isEditing) {
+        nextTabIds.add(tabId);
+      } else {
+        nextTabIds.delete(tabId);
+      }
+
+      return nextTabIds;
+    });
+  }, []);
   const splitTab = useMemo(() => {
     if (!splitTabId) {
       return null;
@@ -693,6 +715,8 @@ export function MarkdownReader() {
       reader.stop();
     }
 
+    setTabEditing(activeTab.id, false);
+
     updateTab(
       activeTab.id,
       {
@@ -721,6 +745,7 @@ export function MarkdownReader() {
   async function handleClearReaderSession() {
     reader.stop();
     setSplitTabId(null);
+    setEditingTabIds(new Set());
 
     const freshTab = createReaderTab();
     const nextState: ReaderState = {
@@ -783,6 +808,7 @@ export function MarkdownReader() {
     setSplitTabId((currentSplitTabId) =>
       currentSplitTabId === tabId ? null : currentSplitTabId,
     );
+    setTabEditing(tabId, false);
 
     const currentState = getCurrentReaderState();
     const closedIndex = currentState.tabs.findIndex((tab) => tab.id === tabId);
@@ -865,11 +891,15 @@ export function MarkdownReader() {
 
       <Tabs
         className="flex min-h-0 flex-1 flex-col gap-0"
-        onValueChange={(value) =>
+        onValueChange={(value) => {
+          if (value === "source") {
+            setTabEditing(activeTab.id, false);
+          }
+
           updateTab(activeTab.id, {
             view: value === "source" && file ? "source" : "preview",
-          })
-        }
+          });
+        }}
         value={documentView}
       >
         {/* Browser chrome: tab strip + address-bar toolbar */}
@@ -1001,21 +1031,34 @@ export function MarkdownReader() {
               </div>
             ) : null}
 
-            <TabsList
-              aria-label="Document view"
-              className={cn("shrink-0", splitTab && "lg:hidden")}
+            <div
+              className={cn(
+                "flex shrink-0 items-center gap-1.5",
+                splitTab && "lg:hidden",
+              )}
             >
-              <TabsTrigger value="preview">
-                <BookOpen aria-hidden="true" />
-                <span className="hidden sm:inline">Preview</span>
-              </TabsTrigger>
-              {file ? (
-                <TabsTrigger value="source">
-                  <Braces aria-hidden="true" />
-                  <span className="hidden sm:inline">Source</span>
+              <TabsList aria-label="Document view" className="shrink-0">
+                <TabsTrigger aria-label="Preview" value="preview">
+                  <BookOpen aria-hidden="true" />
+                  <span className="hidden sm:inline">Preview</span>
                 </TabsTrigger>
+                {file ? (
+                  <TabsTrigger aria-label="Source" value="source">
+                    <Braces aria-hidden="true" />
+                    <span className="hidden sm:inline">Source</span>
+                  </TabsTrigger>
+                ) : null}
+              </TabsList>
+
+              {file && documentView === "preview" && !splitTab ? (
+                <EditPreviewButton
+                  isEditing={editingTabIds.has(activeTab.id)}
+                  onEditingChange={(isEditing) =>
+                    setTabEditing(activeTab.id, isEditing)
+                  }
+                />
               ) : null}
-            </TabsList>
+            </div>
           </div>
 
           {file ? (
@@ -1052,6 +1095,8 @@ export function MarkdownReader() {
               <SplitReaderView
                 activeTabId={activeTab.id}
                 className="hidden lg:flex"
+                editingTabIds={editingTabIds}
+                onEditingChange={setTabEditing}
                 onSelectSplitTab={setSplitTabId}
                 onSourceChange={editTabContent}
                 primaryTab={activeTab}
@@ -1065,6 +1110,7 @@ export function MarkdownReader() {
                 activeTab={activeTab}
                 className="flex lg:hidden"
                 handlePaste={handlePaste}
+                isEditing={false}
                 isDragging={isDragging}
                 onChooseFile={openFilePicker}
                 onOpenPaste={() => setIsPasteDialogOpen(true)}
@@ -1080,6 +1126,7 @@ export function MarkdownReader() {
               activeTab={activeTab}
               className="flex"
               handlePaste={handlePaste}
+              isEditing={editingTabIds.has(activeTab.id)}
               isDragging={isDragging}
               onChooseFile={openFilePicker}
               onOpenPaste={() => setIsPasteDialogOpen(true)}
@@ -1178,11 +1225,48 @@ function useReaderTabModel(tab: ReaderTab | null): ReaderTabModel {
   };
 }
 
+function EditPreviewButton({
+  compact = false,
+  isEditing,
+  onEditingChange,
+}: {
+  compact?: boolean;
+  isEditing: boolean;
+  onEditingChange: (isEditing: boolean) => void;
+}) {
+  const label = isEditing ? "Done editing preview" : "Edit preview";
+
+  return (
+    <Button
+      aria-label={label}
+      aria-pressed={isEditing}
+      className="shrink-0"
+      onClick={() => onEditingChange(!isEditing)}
+      size={compact ? "icon-sm" : "sm"}
+      title={label}
+      type="button"
+      variant={isEditing ? "default" : "outline"}
+    >
+      {isEditing ? (
+        <Check aria-hidden="true" />
+      ) : (
+        <PencilLine aria-hidden="true" />
+      )}
+      {!compact ? (
+        <span className="hidden xl:inline">
+          {isEditing ? "Done" : "Edit preview"}
+        </span>
+      ) : null}
+    </Button>
+  );
+}
+
 function SingleReaderView({
   activeModel,
   activeTab,
   className,
   handlePaste,
+  isEditing,
   isDragging,
   onChooseFile,
   onOpenPaste,
@@ -1195,6 +1279,7 @@ function SingleReaderView({
   activeTab: ReaderTab;
   className?: string;
   handlePaste: (event: ClipboardEvent<HTMLElement>) => void;
+  isEditing: boolean;
   isDragging: boolean;
   onChooseFile: () => void;
   onOpenPaste: () => void;
@@ -1253,7 +1338,8 @@ function SingleReaderView({
                     activeModel.readAloudChunkLines,
                   )}
                   content={file.content}
-                  key={activeTab.id}
+                  isEditing={isEditing}
+                  key={`${activeTab.id}:${isEditing ? "editing" : "reading"}`}
                   onActiveHeadingChange={(headingId) =>
                     updateTab(activeTab.id, { activeHeadingId: headingId })
                   }
@@ -1299,6 +1385,8 @@ function SingleReaderView({
 function SplitReaderView({
   activeTabId,
   className,
+  editingTabIds,
+  onEditingChange,
   onSelectSplitTab,
   onSourceChange,
   primaryTab,
@@ -1309,6 +1397,8 @@ function SplitReaderView({
 }: {
   activeTabId: string;
   className?: string;
+  editingTabIds: ReadonlySet<string>;
+  onEditingChange: (tabId: string, isEditing: boolean) => void;
   onSelectSplitTab: (tabId: string) => void;
   onSourceChange: (tabId: string, content: string) => void;
   primaryTab: ReaderTab;
@@ -1324,7 +1414,11 @@ function SplitReaderView({
     >
       <ResizablePanel defaultSize={50} minSize={35}>
         <SplitReaderPane
+          isEditing={editingTabIds.has(primaryTab.id)}
           label="Active tab"
+          onEditingChange={(isEditing) =>
+            onEditingChange(primaryTab.id, isEditing)
+          }
           onSourceChange={onSourceChange}
           reader={reader}
           tab={primaryTab}
@@ -1335,7 +1429,11 @@ function SplitReaderView({
       <ResizablePanel defaultSize={50} minSize={35}>
         <SplitReaderPane
           activeTabId={activeTabId}
+          isEditing={editingTabIds.has(secondaryTab.id)}
           label="Second tab"
+          onEditingChange={(isEditing) =>
+            onEditingChange(secondaryTab.id, isEditing)
+          }
           onSelectTab={onSelectSplitTab}
           onSourceChange={onSourceChange}
           reader={reader}
@@ -1350,7 +1448,9 @@ function SplitReaderView({
 
 function SplitReaderPane({
   activeTabId,
+  isEditing,
   label,
+  onEditingChange,
   onSelectTab,
   onSourceChange,
   reader,
@@ -1359,7 +1459,9 @@ function SplitReaderPane({
   updateTab,
 }: {
   activeTabId?: string;
+  isEditing: boolean;
   label: string;
+  onEditingChange: (isEditing: boolean) => void;
   onSelectTab?: (tabId: string) => void;
   onSourceChange: (tabId: string, content: string) => void;
   reader: ReadAloudController;
@@ -1373,11 +1475,15 @@ function SplitReaderPane({
   return (
     <Tabs
       className="flex h-full min-h-0 flex-col bg-card text-card-foreground"
-      onValueChange={(value) =>
+      onValueChange={(value) => {
+        if (value === "source") {
+          onEditingChange(false);
+        }
+
         updateTab(tab.id, {
           view: value === "source" && file ? "source" : "preview",
-        })
-      }
+        });
+      }}
       value={tab.view}
     >
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 bg-muted/30 px-2.5 sm:px-3">
@@ -1420,16 +1526,26 @@ function SplitReaderPane({
         </div>
 
         {file ? (
-          <TabsList aria-label={`${label} view`} className="shrink-0">
-            <TabsTrigger value="preview">
-              <BookOpen aria-hidden="true" />
-              <span className="hidden xl:inline">Preview</span>
-            </TabsTrigger>
-            <TabsTrigger value="source">
-              <Braces aria-hidden="true" />
-              <span className="hidden xl:inline">Source</span>
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <TabsList aria-label={`${label} view`} className="shrink-0">
+              <TabsTrigger aria-label="Preview" value="preview">
+                <BookOpen aria-hidden="true" />
+                <span className="hidden xl:inline">Preview</span>
+              </TabsTrigger>
+              <TabsTrigger aria-label="Source" value="source">
+                <Braces aria-hidden="true" />
+                <span className="hidden xl:inline">Source</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {tab.view === "preview" ? (
+              <EditPreviewButton
+                compact
+                isEditing={isEditing}
+                onEditingChange={onEditingChange}
+              />
+            ) : null}
+          </div>
         ) : null}
       </div>
 
@@ -1463,7 +1579,8 @@ function SplitReaderPane({
                   model.readAloudChunkLines,
                 )}
                 content={file.content}
-                key={tab.id}
+                isEditing={isEditing}
+                key={`${tab.id}:${isEditing ? "editing" : "reading"}`}
                 onActiveHeadingChange={(headingId) =>
                   updateTab(tab.id, { activeHeadingId: headingId })
                 }
