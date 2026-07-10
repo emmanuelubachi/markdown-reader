@@ -1,5 +1,5 @@
 import { toPlainSpeechText } from "@/lib/markdown/speech";
-import type { ReaderTab } from "@/lib/markdown/types";
+import type { LoadedFile, ReaderTab } from "@/lib/markdown/types";
 
 export function isMarkdownFile(file: File) {
   const normalizedName = file.name.toLowerCase();
@@ -29,6 +29,18 @@ export function createReaderTab(): ReaderTab {
     activeHeadingId: null,
     error: null,
     file: null,
+    id: createDocumentId(),
+    view: "preview",
+  };
+}
+
+// A fresh tab that already holds a loaded document — used when opening several
+// files at once, so each file gets its own tab.
+export function createLoadedReaderTab(file: LoadedFile): ReaderTab {
+  return {
+    activeHeadingId: null,
+    error: null,
+    file,
     id: createDocumentId(),
     view: "preview",
   };

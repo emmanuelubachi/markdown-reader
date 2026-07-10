@@ -21,6 +21,7 @@ import {
   Search,
   Upload,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { FileSummary } from "@/components/markdown-reader/file-summary";
 import { MarkdownPreview } from "@/components/markdown-reader/markdown-preview";
@@ -39,8 +40,13 @@ import {
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/markdown/constants";
 import {
+  ACCEPTED_FILE_TYPES,
+  MAX_FILE_SIZE,
+  MAX_OPEN_FILES,
+} from "@/lib/markdown/constants";
+import {
+  createLoadedReaderTab,
   createReaderTab,
   getPastedDocumentName,
   getReaderTabLabel,
@@ -98,6 +104,9 @@ export function MarkdownReader() {
   const lastPersistedSignatureRef = useRef<null | string>(null);
   const saveIndicatorTimeoutRef = useRef<null | number>(null);
   const saveSequenceRef = useRef(0);
+  // Nesting-safe drag counter: dragenter/dragleave fire for every child the
+  // pointer crosses, so we track depth and only clear the overlay at zero.
+  const dragDepthRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [isPersistenceReady, setIsPersistenceReady] = useState(false);
@@ -416,45 +425,158 @@ export function MarkdownReader() {
     });
   }
 
-  async function loadFile(
-    selectedFile: File | undefined,
-    tabId = activeTab.id,
-  ) {
-    if (!selectedFile) {
+  function clearFileInput() {
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  }
+
+  function notifySkipped(counts: {
+    nonMarkdown: number;
+    overCap: number;
+    tooLarge: number;
+    unreadable: number;
+  }) {
+    const skipped =
+      counts.nonMarkdown + counts.tooLarge + counts.unreadable + counts.overCap;
+
+    if (skipped === 0) {
       return;
     }
 
-    if (!isMarkdownFile(selectedFile)) {
-      updateTab(tabId, {
-        error: "Choose a markdown file with a .md or .markdown extension.",
-      });
+    const description = [
+      counts.nonMarkdown > 0 && `${counts.nonMarkdown} not markdown`,
+      counts.tooLarge > 0 && `${counts.tooLarge} over 5 MB`,
+      counts.unreadable > 0 && `${counts.unreadable} unreadable`,
+      counts.overCap > 0 &&
+        `${counts.overCap} over the ${MAX_OPEN_FILES}-file limit`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    toast.warning(`Skipped ${skipped} file${skipped === 1 ? "" : "s"}`, {
+      description,
+    });
+  }
+
+  // Open one or more markdown files, each in its own tab. Reads and validates
+  // them in parallel, then commits every new tab in a single state update (one
+  // persistence write). The first file reuses the active tab when it's empty.
+  async function openFiles(fileList: File[]) {
+    if (fileList.length === 0) {
       return;
     }
 
-    if (selectedFile.size > MAX_FILE_SIZE) {
-      updateTab(tabId, {
-        error: "This file is larger than 5 MB. Try a smaller markdown file.",
-      });
-      return;
-    }
+    const markdownFiles = fileList.filter(isMarkdownFile);
+    const nonMarkdown = fileList.length - markdownFiles.length;
+    const overCap = Math.max(0, markdownFiles.length - MAX_OPEN_FILES);
+    const candidates = markdownFiles.slice(0, MAX_OPEN_FILES);
+    const isSingleSelection = fileList.length === 1;
 
-    try {
-      const content = await selectedFile.text();
-      loadTabContent(tabId, {
-        content,
-        lastModified: selectedFile.lastModified,
-        name: selectedFile.name,
-        size: selectedFile.size,
-        source: "file",
-      });
-      if (inputRef.current) {
-        inputRef.current.value = "";
+    if (candidates.length === 0) {
+      // A lone non-markdown file keeps the original per-tab error; a mixed
+      // batch of junk just reports and leaves the current document alone.
+      if (isSingleSelection) {
+        updateTab(activeTab.id, {
+          error: "Choose a markdown file with a .md or .markdown extension.",
+        });
+      } else {
+        notifySkipped({ nonMarkdown, overCap, tooLarge: 0, unreadable: 0 });
       }
-    } catch {
-      updateTab(tabId, {
-        error: "The file could not be read. Try exporting it again.",
-      });
+
+      clearFileInput();
+      return;
     }
+
+    // Promise.all preserves input order, so tab order matches selection order.
+    const results = await Promise.all(
+      candidates.map(async (file) => {
+        if (file.size > MAX_FILE_SIZE) {
+          return { status: "too-large" as const };
+        }
+
+        try {
+          const content = await file.text();
+
+          return {
+            loaded: {
+              content,
+              lastModified: file.lastModified,
+              name: file.name,
+              size: file.size,
+              source: "file",
+            } satisfies LoadedFile,
+            status: "ok" as const,
+          };
+        } catch {
+          return { status: "unreadable" as const };
+        }
+      }),
+    );
+
+    const loaded = results.flatMap((result) =>
+      result.status === "ok" ? [result.loaded] : [],
+    );
+    const tooLarge = results.filter((r) => r.status === "too-large").length;
+    const unreadable = results.filter((r) => r.status === "unreadable").length;
+
+    if (loaded.length === 0) {
+      if (isSingleSelection) {
+        updateTab(activeTab.id, {
+          error: tooLarge
+            ? "This file is larger than 5 MB. Try a smaller markdown file."
+            : "The file could not be read. Try exporting it again.",
+        });
+      } else {
+        notifySkipped({ nonMarkdown, overCap, tooLarge, unreadable });
+      }
+
+      clearFileInput();
+      return;
+    }
+
+    // Read state AFTER the await so a tab switch during the read still targets
+    // the tab the user is actually on.
+    const currentState = getCurrentReaderState();
+    const activeIsEmpty =
+      currentState.tabs.find((tab) => tab.id === currentState.activeTabId)
+        ?.file == null;
+
+    let tabs: ReaderTab[];
+    let firstOpenedId: string;
+
+    if (activeIsEmpty) {
+      const [firstFile, ...restFiles] = loaded;
+
+      firstOpenedId = currentState.activeTabId;
+      tabs = [
+        ...currentState.tabs.map((tab) =>
+          tab.id === currentState.activeTabId
+            ? {
+                ...tab,
+                activeHeadingId: null,
+                error: null,
+                file: firstFile,
+                view: "preview" as const,
+              }
+            : tab,
+        ),
+        ...restFiles.map(createLoadedReaderTab),
+      ];
+    } else {
+      const newTabs = loaded.map(createLoadedReaderTab);
+
+      firstOpenedId = newTabs[0]!.id;
+      tabs = [...currentState.tabs, ...newTabs];
+    }
+
+    commitReaderState(
+      { activeTabId: firstOpenedId, tabs },
+      { persistImmediately: true },
+    );
+
+    clearFileInput();
+    notifySkipped({ nonMarkdown, overCap, tooLarge, unreadable });
   }
 
   function loadMarkdownText(content: string, tabId = activeTab.id) {
@@ -490,29 +612,53 @@ export function MarkdownReader() {
     inputRef.current?.click();
   }
 
-  function handleDragEnter(event: DragEvent<HTMLElement>) {
-    event.preventDefault();
-    setIsDragging(true);
+  function dragHasFiles(event: DragEvent<HTMLElement>) {
+    return Array.from(event.dataTransfer?.types ?? []).includes("Files");
   }
 
-  function handleDragLeave(event: DragEvent<HTMLElement>) {
-    event.preventDefault();
-    const nextTarget = event.relatedTarget;
-
-    if (
-      nextTarget instanceof Node &&
-      event.currentTarget.contains(nextTarget)
-    ) {
+  function handleDragEnter(event: DragEvent<HTMLElement>) {
+    if (!dragHasFiles(event)) {
       return;
     }
 
-    setIsDragging(false);
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragging(true);
+  }
+
+  function handleDragOver(event: DragEvent<HTMLElement>) {
+    if (!dragHasFiles(event)) {
+      return;
+    }
+
+    // Required for the drop to fire at all.
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLElement>) {
+    if (!dragHasFiles(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+
+    if (dragDepthRef.current === 0) {
+      setIsDragging(false);
+    }
   }
 
   function handleDrop(event: DragEvent<HTMLElement>) {
     event.preventDefault();
+    dragDepthRef.current = 0;
     setIsDragging(false);
-    void loadFile(event.dataTransfer.files.item(0) ?? undefined, activeTab.id);
+
+    if (!dragHasFiles(event)) {
+      return;
+    }
+
+    void openFiles(Array.from(event.dataTransfer.files));
   }
 
   function resetReader() {
@@ -665,8 +811,26 @@ export function MarkdownReader() {
   return (
     <main
       className="core-app-shell flex h-screen flex-col overflow-hidden text-foreground"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       onPaste={handlePaste}
     >
+      {isDragging ? (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-6 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[#58D1E2] bg-[#58D1E2]/12 px-10 py-8 text-center text-[#03444A] shadow-lg dark:text-[#58D1E2]">
+            <Upload className="size-8" aria-hidden="true" />
+            <p className="text-base font-semibold">
+              Drop markdown files to open
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Each file opens in its own tab
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <Tabs
         className="flex min-h-0 flex-1 flex-col gap-0"
         onValueChange={(value) =>
@@ -817,12 +981,14 @@ export function MarkdownReader() {
           ref={inputRef}
           accept={ACCEPTED_FILE_TYPES}
           className="sr-only"
-          onChange={(event) =>
-            void loadFile(
-              event.currentTarget.files?.item(0) ?? undefined,
-              activeTab.id,
-            )
-          }
+          multiple
+          onChange={(event) => {
+            const files = event.currentTarget.files;
+
+            if (files && files.length > 0) {
+              void openFiles(Array.from(files));
+            }
+          }}
           type="file"
         />
 
@@ -843,9 +1009,6 @@ export function MarkdownReader() {
                 activeModel={activeModel}
                 activeTab={activeTab}
                 className="flex lg:hidden"
-                handleDragEnter={handleDragEnter}
-                handleDragLeave={handleDragLeave}
-                handleDrop={handleDrop}
                 handlePaste={handlePaste}
                 isDragging={isDragging}
                 onChooseFile={openFilePicker}
@@ -860,9 +1023,6 @@ export function MarkdownReader() {
               activeModel={activeModel}
               activeTab={activeTab}
               className="flex"
-              handleDragEnter={handleDragEnter}
-              handleDragLeave={handleDragLeave}
-              handleDrop={handleDrop}
               handlePaste={handlePaste}
               isDragging={isDragging}
               onChooseFile={openFilePicker}
@@ -940,9 +1100,6 @@ function SingleReaderView({
   activeModel,
   activeTab,
   className,
-  handleDragEnter,
-  handleDragLeave,
-  handleDrop,
   handlePaste,
   isDragging,
   onChooseFile,
@@ -954,9 +1111,6 @@ function SingleReaderView({
   activeModel: ReaderTabModel;
   activeTab: ReaderTab;
   className?: string;
-  handleDragEnter: (event: DragEvent<HTMLElement>) => void;
-  handleDragLeave: (event: DragEvent<HTMLElement>) => void;
-  handleDrop: (event: DragEvent<HTMLElement>) => void;
   handlePaste: (event: ClipboardEvent<HTMLElement>) => void;
   isDragging: boolean;
   onChooseFile: () => void;
@@ -1026,10 +1180,6 @@ function SingleReaderView({
                   <EmptyPreview
                     isDragging={isDragging}
                     onChooseFile={onChooseFile}
-                    onDragEnter={handleDragEnter}
-                    onDragLeave={handleDragLeave}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={handleDrop}
                     onPaste={handlePaste}
                     onPasteMarkdown={onOpenPaste}
                   />
