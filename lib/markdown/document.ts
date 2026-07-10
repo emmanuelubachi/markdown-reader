@@ -57,6 +57,20 @@ export function getPastedDocumentName(content: string) {
   return `${baseName.slice(0, 48) || "Pasted markdown"}.md`;
 }
 
+// Turns a document name into a safe filename for downloading, guaranteeing a
+// markdown extension so the saved file opens as markdown.
+export function getDownloadFileName(name: string) {
+  const safeName = name.replace(/[/\\:*?"<>|]/g, "").trim() || "document";
+  const lowerName = safeName.toLowerCase();
+  const hasMarkdownExtension =
+    lowerName.endsWith(".md") ||
+    lowerName.endsWith(".markdown") ||
+    lowerName.endsWith(".mdown") ||
+    lowerName.endsWith(".mkd");
+
+  return hasMarkdownExtension ? safeName : `${safeName}.md`;
+}
+
 export function formatBytes(bytes: number) {
   if (bytes < 1024) {
     return `${bytes} B`;

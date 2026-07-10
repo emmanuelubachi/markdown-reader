@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ClipboardPaste,
   Columns2,
+  Download,
   FileText,
   PanelRightClose,
   Search,
@@ -42,6 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/markdown/constants";
 import {
   createReaderTab,
+  getDownloadFileName,
   getPastedDocumentName,
   getReaderTabLabel,
   isEditablePasteTarget,
@@ -494,6 +496,28 @@ export function MarkdownReader() {
     inputRef.current?.click();
   }
 
+  // Save the active document (including any source edits) to the user's device
+  // as a .md file — a client-side Blob download, nothing leaves the browser.
+  function downloadDocument() {
+    if (!file) {
+      return;
+    }
+
+    const blob = new Blob([file.content], {
+      type: "text/markdown;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+
+    anchor.download = getDownloadFileName(file.name);
+    anchor.href = url;
+    anchor.rel = "noopener";
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   function handleDragEnter(event: DragEvent<HTMLElement>) {
     event.preventDefault();
     setIsDragging(true);
@@ -795,6 +819,16 @@ export function MarkdownReader() {
                   variant="secondary"
                 >
                   <ClipboardPaste aria-hidden="true" />
+                </Button>
+                <Button
+                  aria-label="Download this Markdown file"
+                  onClick={downloadDocument}
+                  size="icon"
+                  title="Download .md"
+                  type="button"
+                  variant="secondary"
+                >
+                  <Download aria-hidden="true" />
                 </Button>
               </div>
             ) : null}
