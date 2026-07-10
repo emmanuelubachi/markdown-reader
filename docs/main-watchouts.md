@@ -8,7 +8,7 @@ Baseline implemented: preview now renders through `react-markdown` with `remark-
 
 ## Remote Markdown Resources
 
-Remote images are blocked by default to preserve the reader's local-only trust boundary. If remote media support is added later, require an explicit per-document user action and avoid silently loading URLs embedded in untrusted markdown.
+External HTTP(S) images are allowed because the local-only guarantee applies to the Markdown file and document content: the app does not upload or store either on a server. Loading an external image does contact the host referenced by that image directly from the browser, so keep the URL-scheme allowlist in place and never proxy document content through the app server.
 
 ## Reader Tab State Complexity
 

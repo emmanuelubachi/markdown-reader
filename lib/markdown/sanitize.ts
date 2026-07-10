@@ -26,14 +26,22 @@ export function sanitizeHref(rawHref: string) {
 export function sanitizeImageSrc(rawSrc: string) {
   const src = rawSrc.trim();
 
-  if (!src) {
+  if (!src || /[\u0000-\u001F\u007F]/.test(src)) {
     return null;
   }
 
-  // The reader promises that opening a document does not contact hosts named by
-  // that document. Keep images self-contained and restrict inline data to
-  // raster formats; SVG can reference external resources of its own.
-  return /^data:image\/(?:avif|gif|jpe?g|png|webp)(?:;[^,]*)?,/i.test(src)
-    ? src
-    : null;
+  // Keep inline data restricted to raster formats; SVG can reference external
+  // resources of its own. Ordinary web images are loaded directly by the
+  // browser without uploading the Markdown document to the app server.
+  if (/^data:image\/(?:avif|gif|jpe?g|png|webp)(?:;[^,]*)?,/i.test(src)) {
+    return src;
+  }
+
+  try {
+    const url = new URL(src);
+
+    return url.protocol === "http:" || url.protocol === "https:" ? src : null;
+  } catch {
+    return null;
+  }
 }
