@@ -51,6 +51,62 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+@layer components {
+  .reader-markdown-editor {
+    background: transparent;
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+
+  .reader-markdown-editor .mdxeditor-toolbar {
+    background: color-mix(in oklab, var(--background) 94%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 0.65rem;
+    box-shadow: 0 1px 2px color-mix(in oklab, black 8%, transparent);
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    position: sticky;
+    scrollbar-width: thin;
+    top: 0;
+    z-index: 20;
+  }
+
+  .reader-markdown-editor .mdxeditor-root-contenteditable {
+    background: transparent;
+  }
+
+  .reader-markdown-editor .reader-markdown-content {
+    min-height: 52vh;
+    padding: 1rem 0 4rem;
+  }
+
+  .reader-markdown-editor .reader-markdown-content:focus {
+    outline: none;
+  }
+
+  .reader-markdown-editor .cm-editor {
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  .reader-markdown-editor .cm-scroller {
+    font-family: var(--font-mono);
+  }
+
+  @media (max-width: 640px) {
+    .reader-markdown-editor .mdxeditor-toolbar {
+      border-radius: 0.5rem;
+    }
+
+    .reader-markdown-editor .reader-markdown-content {
+      min-height: 46vh;
+      padding-bottom: 3rem;
+    }
+  }
+}
+
 :root {
   --core-charcoal: #181a1b;
   --core-deep-teal: #03444a;

@@ -25,7 +25,7 @@ import {
 import { toast } from "sonner";
 
 import { FileSummary } from "@/components/markdown-reader/file-summary";
-import { MarkdownPreview } from "@/components/markdown-reader/markdown-preview";
+import { EditableMarkdownPreview } from "@/components/markdown-reader/editable-markdown-preview";
 import { Outline } from "@/components/markdown-reader/outline";
 import { PasteMarkdownDialog } from "@/components/markdown-reader/paste-dialog";
 import { ReadAloudToolbar } from "@/components/markdown-reader/read-aloud-toolbar";
@@ -1246,16 +1246,18 @@ function SingleReaderView({
               )}
             >
               {file ? (
-                <MarkdownPreview
+                <EditableMarkdownPreview
                   activeSourceLine={getSpeakingLine(
                     reader,
                     activeTab.id,
                     activeModel.readAloudChunkLines,
                   )}
                   content={file.content}
+                  key={activeTab.id}
                   onActiveHeadingChange={(headingId) =>
                     updateTab(activeTab.id, { activeHeadingId: headingId })
                   }
+                  onChange={(content) => onSourceChange(activeTab.id, content)}
                 />
               ) : (
                 <div className="flex w-full max-w-md flex-col gap-4">
@@ -1454,16 +1456,18 @@ function SplitReaderPane({
             )}
           >
             {file ? (
-              <MarkdownPreview
+              <EditableMarkdownPreview
                 activeSourceLine={getSpeakingLine(
                   reader,
                   tab.id,
                   model.readAloudChunkLines,
                 )}
                 content={file.content}
+                key={tab.id}
                 onActiveHeadingChange={(headingId) =>
                   updateTab(tab.id, { activeHeadingId: headingId })
                 }
+                onChange={(content) => onSourceChange(tab.id, content)}
               />
             ) : (
               <div className="max-w-sm rounded-lg border border-dashed p-6 text-center">
