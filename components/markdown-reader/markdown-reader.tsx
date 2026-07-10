@@ -72,10 +72,7 @@ import {
   type SpeechSection,
 } from "@/lib/markdown/speech";
 import { getDocumentStats } from "@/lib/markdown/stats";
-import {
-  useReadAloud,
-  type ReadAloudController,
-} from "@/hooks/use-read-aloud";
+import { useReadAloud, type ReadAloudController } from "@/hooks/use-read-aloud";
 import type {
   DocumentStats,
   HeadingBlock,
@@ -1242,21 +1239,22 @@ function EditPreviewButton({
       aria-pressed={isEditing}
       className="shrink-0"
       onClick={() => onEditingChange(!isEditing)}
-      size={compact ? "icon-sm" : "sm"}
+      size={compact ? "icon-sm" : "icon"}
       title={label}
       type="button"
-      variant={isEditing ? "default" : "outline"}
+      variant={isEditing ? "default" : "secondary"}
     >
       {isEditing ? (
         <Check aria-hidden="true" />
       ) : (
         <PencilLine aria-hidden="true" />
       )}
-      {!compact ? (
-        <span className="hidden xl:inline">
-          {isEditing ? "Done" : "Edit preview"}
-        </span>
-      ) : null}
+      {!compact
+        ? // <span className="hidden xl:inline">
+          //   {isEditing ? "Done" : "Edit preview"}
+          // </span>
+          null
+        : null}
     </Button>
   );
 }
