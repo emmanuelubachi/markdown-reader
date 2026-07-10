@@ -1,7 +1,7 @@
 "use client";
 
 import { ClipboardPaste, Upload } from "lucide-react";
-import type { ClipboardEvent, DragEvent } from "react";
+import type { ClipboardEvent } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,6 @@ import { cn } from "@/lib/utils";
 type DropZoneProps = {
   isDragging: boolean;
   onChooseFile: () => void;
-  onDragEnter: (event: DragEvent<HTMLElement>) => void;
-  onDragLeave: (event: DragEvent<HTMLElement>) => void;
-  onDragOver: (event: DragEvent<HTMLElement>) => void;
-  onDrop: (event: DragEvent<HTMLElement>) => void;
   onPaste: (event: ClipboardEvent<HTMLElement>) => void;
   onPasteMarkdown: () => void;
 };
@@ -21,10 +17,6 @@ type DropZoneProps = {
 function UploadDropZone({
   isDragging,
   onChooseFile,
-  onDragEnter,
-  onDragLeave,
-  onDragOver,
-  onDrop,
   onPaste,
   onPasteMarkdown,
 }: DropZoneProps) {
@@ -37,10 +29,6 @@ function UploadDropZone({
           ? "border-[#58D1E2] bg-[#58D1E2]/12 text-[#03444A] shadow-[0_0_0_1px_color-mix(in_srgb,var(--core-teal)_35%,transparent)] dark:text-[#58D1E2]"
           : "border-border hover:border-[#58D1E2]/55 hover:bg-muted/35",
       )}
-      onDragEnter={onDragEnter}
-      onDragLeave={onDragLeave}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
       onPaste={onPaste}
       tabIndex={0}
     >

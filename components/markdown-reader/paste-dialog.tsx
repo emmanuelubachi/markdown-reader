@@ -50,11 +50,22 @@ export function PasteMarkdownDialog({
   const isTooLarge = byteSize > MAX_FILE_SIZE;
   const canImport = Boolean(trimmedValue) && !isTooLarge;
 
+  function focusTextarea() {
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
   async function pasteFromClipboard() {
-    if (!navigator.clipboard?.readText) {
-      setClipboardHint(
-        "Clipboard access is unavailable — paste with your keyboard.",
-      );
+    // Reading the clipboard programmatically is permission-gated. Chromium
+    // grants it on a user gesture (a genuine one-click paste); Firefox/Safari
+    // force a separate "Paste" confirmation we can't skip. In those browsers we
+    // skip the API entirely and focus the box, so a single ⌘V / Ctrl+V pastes
+    // with no prompt at all (pasting into a focused field needs no permission).
+    const canReadSilently =
+      "userAgentData" in navigator && Boolean(navigator.clipboard?.readText);
+
+    if (!canReadSilently) {
+      setClipboardHint("Press ⌘V or Ctrl+V to paste here.");
+      focusTextarea();
       return;
     }
 
@@ -62,17 +73,17 @@ export function PasteMarkdownDialog({
       const text = await navigator.clipboard.readText();
 
       if (!text.trim()) {
-        setClipboardHint("Your clipboard is empty.");
+        setClipboardHint("Your clipboard is empty — press ⌘V or Ctrl+V here.");
+        focusTextarea();
         return;
       }
 
       setValue(text);
       setClipboardHint(null);
-      requestAnimationFrame(() => textareaRef.current?.focus());
+      focusTextarea();
     } catch {
-      setClipboardHint(
-        "Clipboard access was blocked — paste with your keyboard instead.",
-      );
+      setClipboardHint("Press ⌘V or Ctrl+V to paste here.");
+      focusTextarea();
     }
   }
 
@@ -110,7 +121,7 @@ export function PasteMarkdownDialog({
             aria-invalid={isTooLarge}
             aria-label="Markdown to import"
             autoFocus
-            className="max-h-[45vh] min-h-44 resize-none font-mono text-xs leading-relaxed"
+            className="max-h-[45vh] min-h-44 resize-none font-mono text-xs leading-relaxed scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 scrollbar-hover:scrollbar-thumb-muted-foreground/50"
             onChange={(event) => setValue(event.currentTarget.value)}
             placeholder={"# Title\n\nPaste your markdown here…"}
             ref={textareaRef}
