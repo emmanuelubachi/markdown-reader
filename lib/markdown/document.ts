@@ -50,6 +50,48 @@ export function createLoadedReaderTab(file: LoadedFile): ReaderTab {
   };
 }
 
+export function reorderReaderTabs(
+  state: ReaderState,
+  movedTabId: string,
+  targetTabId: string,
+  placement: "after" | "before",
+): ReaderState {
+  const movedIndex = state.tabs.findIndex((tab) => tab.id === movedTabId);
+  const targetIndex = state.tabs.findIndex((tab) => tab.id === targetTabId);
+
+  if (
+    movedIndex === -1 ||
+    targetIndex === -1 ||
+    movedTabId === targetTabId
+  ) {
+    return state;
+  }
+
+  const reorderedTabs = [...state.tabs];
+  const [movedTab] = reorderedTabs.splice(movedIndex, 1);
+
+  if (!movedTab) {
+    return state;
+  }
+
+  let insertionIndex = targetIndex + (placement === "after" ? 1 : 0);
+
+  if (movedIndex < insertionIndex) {
+    insertionIndex -= 1;
+  }
+
+  reorderedTabs.splice(insertionIndex, 0, movedTab);
+
+  if (reorderedTabs.every((tab, index) => tab === state.tabs[index])) {
+    return state;
+  }
+
+  return {
+    ...state,
+    tabs: reorderedTabs,
+  };
+}
+
 // Place imported text into an empty target tab, but never overwrite a document
 // that is already open. This keeps app-level paste convenient without turning a
 // stray Cmd/Ctrl+V into a destructive action.

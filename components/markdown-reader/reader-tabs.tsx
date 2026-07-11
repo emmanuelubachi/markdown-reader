@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type DragEvent, type KeyboardEvent } from "react";
 import {
   AlertCircle,
   FileText,
@@ -46,11 +46,21 @@ type ReaderPersistenceStatus =
   | "saving"
   | "unavailable";
 
+type TabPlacement = "after" | "before";
+
+type TabDropTarget = {
+  placement: TabPlacement;
+  tabId: string;
+};
+
+const READER_TAB_DRAG_TYPE = "application/x-markdown-reader-tab";
+
 export function ReaderTabs({
   activeTabId,
   onClearSession,
   onCloseTab,
   onNewTab,
+  onReorderTab,
   onSelectTab,
   persistenceStatus,
   tabs,
@@ -59,12 +69,125 @@ export function ReaderTabs({
   onClearSession: () => void;
   onCloseTab: (tabId: string) => void;
   onNewTab: () => void;
+  onReorderTab: (
+    movedTabId: string,
+    targetTabId: string,
+    placement: TabPlacement,
+  ) => void;
   onSelectTab: (tabId: string) => void;
   persistenceStatus: ReaderPersistenceStatus;
   tabs: ReaderTab[];
 }) {
+  const [announcement, setAnnouncement] = useState("");
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<TabDropTarget | null>(null);
+
+  function resetDragState() {
+    setDraggedTabId(null);
+    setDropTarget(null);
+  }
+
+  function handleTabDragStart(event: DragEvent<HTMLButtonElement>, tabId: string) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(READER_TAB_DRAG_TYPE, tabId);
+    setDraggedTabId(tabId);
+    setDropTarget(null);
+  }
+
+  function handleTabDragOver(
+    event: DragEvent<HTMLDivElement>,
+    targetTabId: string,
+  ) {
+    const movedTabId =
+      draggedTabId || event.dataTransfer.getData(READER_TAB_DRAG_TYPE);
+
+    if (!movedTabId || movedTabId === targetTabId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+
+    const targetBounds = event.currentTarget.getBoundingClientRect();
+    const placement: TabPlacement =
+      event.clientX < targetBounds.left + targetBounds.width / 2
+        ? "before"
+        : "after";
+
+    setDropTarget((currentTarget) =>
+      currentTarget?.tabId === targetTabId &&
+      currentTarget.placement === placement
+        ? currentTarget
+        : { placement, tabId: targetTabId },
+    );
+  }
+
+  function handleTabDrop(
+    event: DragEvent<HTMLDivElement>,
+    targetTabId: string,
+  ) {
+    const movedTabId =
+      draggedTabId || event.dataTransfer.getData(READER_TAB_DRAG_TYPE);
+    const placement =
+      dropTarget?.tabId === targetTabId ? dropTarget.placement : "before";
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (movedTabId && movedTabId !== targetTabId) {
+      const movedIndex = tabs.findIndex((tab) => tab.id === movedTabId);
+      const targetIndex = tabs.findIndex((tab) => tab.id === targetTabId);
+
+      onReorderTab(movedTabId, targetTabId, placement);
+
+      if (movedIndex !== -1 && targetIndex !== -1) {
+        setAnnouncement(
+          `${getReaderTabLabel(tabs[movedIndex]!, movedIndex)} moved ${placement} ${getReaderTabLabel(tabs[targetIndex]!, targetIndex)}.`,
+        );
+      }
+    }
+
+    resetDragState();
+  }
+
+  function handleTabKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    tab: ReaderTab,
+    index: number,
+  ) {
+    if (
+      !event.altKey ||
+      !event.shiftKey ||
+      (event.key !== "ArrowLeft" && event.key !== "ArrowRight")
+    ) {
+      return;
+    }
+
+    const moveLeft = event.key === "ArrowLeft";
+    const targetIndex = index + (moveLeft ? -1 : 1);
+    const targetTab = tabs[targetIndex];
+
+    if (!targetTab) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const placement: TabPlacement = moveLeft ? "before" : "after";
+
+    onReorderTab(tab.id, targetTab.id, placement);
+    setAnnouncement(
+      `${getReaderTabLabel(tab, index)} moved ${placement} ${getReaderTabLabel(targetTab, targetIndex)}.`,
+    );
+  }
+
   return (
     <div className="flex items-end gap-1 px-2.5 pt-2 sm:px-3">
+      <p aria-live="polite" className="sr-only">
+        {announcement}
+      </p>
       <div
         aria-label="Reader tabs"
         className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto scrollbar-hide"
@@ -75,6 +198,7 @@ export function ReaderTabs({
           const label = getReaderTabLabel(tab, index);
           const canClose =
             tabs.length > 1 || Boolean(tab.file) || Boolean(tab.error);
+          const isDropTarget = dropTarget?.tabId === tab.id;
 
           return (
             <div
@@ -83,15 +207,34 @@ export function ReaderTabs({
                 isActive
                   ? "z-10 border-border/70 bg-background text-foreground -mb-px pb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)]"
                   : "border-transparent bg-background/40 text-muted-foreground hover:bg-background/70 hover:text-foreground",
+                draggedTabId === tab.id && "opacity-45",
               )}
               key={tab.id}
+              onDragOver={(event) => handleTabDragOver(event, tab.id)}
+              onDrop={(event) => handleTabDrop(event, tab.id)}
             >
+              {isDropTarget ? (
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "pointer-events-none absolute inset-y-1 z-20 w-0.5 rounded-full bg-[#03444A] shadow-[0_0_0_1px_var(--background)] dark:bg-[#58D1E2]",
+                    dropTarget.placement === "before"
+                      ? "-left-1"
+                      : "-right-1",
+                  )}
+                />
+              ) : null}
               <button
+                aria-keyshortcuts="Alt+Shift+ArrowLeft Alt+Shift+ArrowRight"
                 aria-selected={isActive}
-                className="flex min-w-0 flex-1 items-center gap-2 rounded-t-lg py-2 pl-3 pr-1.5 text-left focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                className="flex min-w-0 flex-1 cursor-grab items-center gap-2 rounded-t-lg py-2 pl-3 pr-1.5 text-left active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                draggable={tabs.length > 1}
                 onClick={() => onSelectTab(tab.id)}
+                onDragEnd={resetDragState}
+                onDragStart={(event) => handleTabDragStart(event, tab.id)}
+                onKeyDown={(event) => handleTabKeyDown(event, tab, index)}
                 role="tab"
-                title={label}
+                title={`${label}${tabs.length > 1 ? " — drag to reorder" : ""}`}
                 type="button"
               >
                 {tab.error ? (

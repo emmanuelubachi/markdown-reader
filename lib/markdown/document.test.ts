@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { placeLoadedFileInReaderState } from "@/lib/markdown/document";
+import {
+  placeLoadedFileInReaderState,
+  reorderReaderTabs,
+} from "@/lib/markdown/document";
 import type {
   LoadedFile,
   ReaderState,
@@ -88,5 +91,47 @@ describe("placeLoadedFileInReaderState", () => {
     expect(nextState.tabs).toHaveLength(2);
     expect(nextState.tabs[0]?.file).toBeNull();
     expect(nextState.tabs[1]?.file).toBe(pastedFile);
+  });
+});
+
+describe("reorderReaderTabs", () => {
+  const tabs = [
+    createTab("first", null),
+    createTab("second", null),
+    createTab("third", null),
+  ];
+  const state: ReaderState = {
+    activeTabId: "second",
+    tabs,
+  };
+
+  it("moves a tab before another tab without changing the active tab", () => {
+    const nextState = reorderReaderTabs(state, "third", "first", "before");
+
+    expect(nextState.tabs.map((tab) => tab.id)).toEqual([
+      "third",
+      "first",
+      "second",
+    ]);
+    expect(nextState.activeTabId).toBe("second");
+  });
+
+  it("moves a tab after another tab", () => {
+    const nextState = reorderReaderTabs(state, "first", "second", "after");
+
+    expect(nextState.tabs.map((tab) => tab.id)).toEqual([
+      "second",
+      "first",
+      "third",
+    ]);
+  });
+
+  it("returns the same state for a no-op or unknown tab", () => {
+    expect(reorderReaderTabs(state, "first", "second", "before")).toBe(
+      state,
+    );
+    expect(reorderReaderTabs(state, "missing", "second", "after")).toBe(
+      state,
+    );
   });
 });
