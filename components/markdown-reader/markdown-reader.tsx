@@ -57,6 +57,7 @@ import {
   isEditablePasteTarget,
   isMarkdownFile,
   placeLoadedFileInReaderState,
+  reorderReaderTabs,
 } from "@/lib/markdown/document";
 import { parseMarkdown } from "@/lib/markdown/parse";
 import {
@@ -410,6 +411,26 @@ export function MarkdownReader() {
       },
       options,
     );
+  }
+
+  function reorderTabs(
+    movedTabId: string,
+    targetTabId: string,
+    placement: "after" | "before",
+  ) {
+    const currentState = getCurrentReaderState();
+    const nextState = reorderReaderTabs(
+      currentState,
+      movedTabId,
+      targetTabId,
+      placement,
+    );
+
+    if (nextState === currentState) {
+      return;
+    }
+
+    commitReaderState(nextState, { persistImmediately: true });
   }
 
   function editTabContent(tabId: string, content: string) {
@@ -906,6 +927,7 @@ export function MarkdownReader() {
             onClearSession={handleClearReaderSession}
             onCloseTab={closeTab}
             onNewTab={createNewTab}
+            onReorderTab={reorderTabs}
             onSelectTab={selectTab}
             persistenceStatus={persistenceStatus}
             tabs={readerState.tabs}
