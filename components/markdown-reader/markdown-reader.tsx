@@ -34,7 +34,6 @@ import { ReadAloudToolbar } from "@/components/markdown-reader/read-aloud-toolba
 import { ReaderTabs } from "@/components/markdown-reader/reader-tabs";
 import { EmptyPreview } from "@/components/markdown-reader/upload-drop-zone";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   ResizableHandle,
@@ -951,40 +950,21 @@ export function MarkdownReader() {
               />
             </div>
 
-            {/* Address bar */}
-            <div
-              className={cn(
-                "flex min-w-0 items-center gap-2 rounded-full border border-border/80 bg-background/90 px-3 py-1.5 shadow-xs ring-1 ring-foreground/5",
-                file ? "max-w-[16rem] shrink lg:max-w-xs" : "flex-1",
-              )}
-            >
-              {file ? (
-                <FileText
-                  className="size-4 shrink-0 text-[#03444A] dark:text-[#58D1E2]"
-                  aria-hidden="true"
-                />
-              ) : (
+            {/* Address bar: empty state only — the active tab already names the open file */}
+            {!file ? (
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border/80 bg-background/90 px-3 py-1.5 shadow-xs ring-1 ring-foreground/5">
                 <Search
                   className="size-4 shrink-0 text-muted-foreground"
                   aria-hidden="true"
                 />
-              )}
-              <span className="truncate text-sm font-medium">
-                {file?.name ?? "Markdown Reader"}
-              </span>
-              {file ? (
-                <Badge
-                  variant="outline"
-                  className="hidden shrink-0 border-[#8EA8AC]/45 text-[#03444A] xl:inline-flex dark:text-[#58D1E2]"
-                >
-                  Local
-                </Badge>
-              ) : (
+                <span className="truncate text-sm font-medium">
+                  Markdown Reader
+                </span>
                 <span className="ml-auto hidden shrink-0 truncate text-xs text-muted-foreground md:inline">
                   Choose, drop, or paste markdown to start
                 </span>
-              )}
-            </div>
+              </div>
+            ) : null}
 
             {file ? (
               <ReadAloudToolbar
