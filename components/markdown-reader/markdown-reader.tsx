@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ClipboardPaste,
   Columns2,
+  Copy,
   Download,
   FileText,
   PanelRightClose,
@@ -1039,23 +1040,27 @@ export function MarkdownReader() {
               <TabsList aria-label="Document view" className="shrink-0">
                 <TabsTrigger aria-label="Preview" value="preview">
                   <BookOpen aria-hidden="true" />
-                  <span className="hidden sm:inline">Preview</span>
+                  <span className="hidden xl:inline">Preview</span>
                 </TabsTrigger>
                 {file ? (
                   <TabsTrigger aria-label="Source" value="source">
                     <Braces aria-hidden="true" />
-                    <span className="hidden sm:inline">Source</span>
+                    <span className="hidden xl:inline">Source</span>
                   </TabsTrigger>
                 ) : null}
               </TabsList>
 
-              {file && documentView === "preview" && !splitTab ? (
-                <EditPreviewButton
-                  isEditing={editingTabIds.has(activeTab.id)}
-                  onEditingChange={(isEditing) =>
-                    setTabEditing(activeTab.id, isEditing)
-                  }
-                />
+              {file && !splitTab ? (
+                documentView === "preview" ? (
+                  <EditPreviewButton
+                    isEditing={editingTabIds.has(activeTab.id)}
+                    onEditingChange={(isEditing) =>
+                      setTabEditing(activeTab.id, isEditing)
+                    }
+                  />
+                ) : (
+                  <CopySourceButton content={file.content} />
+                )
               ) : null}
             </div>
           </div>
@@ -1257,6 +1262,53 @@ function EditPreviewButton({
           // </span>
           null
         : null}
+    </Button>
+  );
+}
+
+function CopySourceButton({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false);
+  const resetTimerRef = useRef<null | number>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current !== null) {
+        window.clearTimeout(resetTimerRef.current);
+      }
+    };
+  }, []);
+
+  const label = copied ? "Copied" : "Copy source";
+
+  return (
+    <Button
+      aria-label={label}
+      className="shrink-0"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(content);
+        } catch {
+          toast.error("Could not copy to the clipboard.");
+          return;
+        }
+
+        setCopied(true);
+
+        if (resetTimerRef.current !== null) {
+          window.clearTimeout(resetTimerRef.current);
+        }
+
+        resetTimerRef.current = window.setTimeout(() => {
+          setCopied(false);
+          resetTimerRef.current = null;
+        }, 2000);
+      }}
+      size="icon"
+      title={label}
+      type="button"
+      variant="secondary"
+    >
+      {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
     </Button>
   );
 }
