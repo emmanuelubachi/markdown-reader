@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, type DragEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent,
+} from "react";
 import {
   AlertCircle,
   FileText,
@@ -55,6 +61,30 @@ type TabDropTarget = {
 
 const READER_TAB_DRAG_TYPE = "application/x-markdown-reader-tab";
 
+function scrollTabIntoView(
+  tabList: HTMLDivElement,
+  activeTab: HTMLDivElement,
+) {
+  const tabListBounds = tabList.getBoundingClientRect();
+  const activeTabBounds = activeTab.getBoundingClientRect();
+  let nextScrollLeft: number | null = null;
+
+  if (activeTabBounds.left < tabListBounds.left) {
+    nextScrollLeft =
+      tabList.scrollLeft + activeTabBounds.left - tabListBounds.left;
+  } else if (activeTabBounds.right > tabListBounds.right) {
+    nextScrollLeft =
+      tabList.scrollLeft + activeTabBounds.right - tabListBounds.right;
+  }
+
+  if (nextScrollLeft !== null) {
+    tabList.scrollTo({
+      behavior: "smooth",
+      left: nextScrollLeft,
+    });
+  }
+}
+
 export function ReaderTabs({
   activeTabId,
   onClearSession,
@@ -78,9 +108,35 @@ export function ReaderTabs({
   persistenceStatus: ReaderPersistenceStatus;
   tabs: ReaderTab[];
 }) {
+  const activeTabRef = useRef<HTMLDivElement>(null);
+  const tabListRef = useRef<HTMLDivElement>(null);
   const [announcement, setAnnouncement] = useState("");
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<TabDropTarget | null>(null);
+
+  useEffect(() => {
+    const tabList = tabListRef.current;
+    const activeTab = activeTabRef.current;
+
+    if (!tabList || !activeTab) {
+      return;
+    }
+
+    const scrollActiveTabIntoView = () =>
+      scrollTabIntoView(tabList, activeTab);
+
+    scrollActiveTabIntoView();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(scrollActiveTabIntoView);
+
+    resizeObserver.observe(tabList);
+
+    return () => resizeObserver.disconnect();
+  }, [activeTabId, tabs]);
 
   function resetDragState() {
     setDraggedTabId(null);
@@ -189,6 +245,7 @@ export function ReaderTabs({
         {announcement}
       </p>
       <div
+        ref={tabListRef}
         aria-label="Reader tabs"
         className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto scrollbar-hide"
         role="tablist"
@@ -202,6 +259,7 @@ export function ReaderTabs({
 
           return (
             <div
+              ref={isActive ? activeTabRef : undefined}
               className={cn(
                 "group relative flex min-w-24 max-w-56 flex-[1_1_14rem] items-center rounded-t-lg border border-b-0 text-sm transition",
                 isActive
