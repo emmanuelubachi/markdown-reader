@@ -244,6 +244,21 @@ export function ReaderTabs({
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
+      <div className="mb-1 flex size-7 shrink-0 items-center justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          alt="Markdown Reader"
+          className="size-6 object-contain dark:hidden"
+          src="/assets/logo-mark-dark.svg"
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          alt=""
+          aria-hidden="true"
+          className="hidden size-6 object-contain dark:block"
+          src="/assets/logo-mark.svg"
+        />
+      </div>
       <div
         ref={tabListRef}
         aria-label="Reader tabs"

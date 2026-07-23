@@ -22,7 +22,6 @@ import {
   FileText,
   PanelRightClose,
   PencilLine,
-  Search,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -999,7 +998,7 @@ export function MarkdownReader() {
         }}
         value={documentView}
       >
-        {/* Browser chrome: tab strip + address-bar toolbar */}
+        {/* Browser chrome: tab strip + document-only reader toolbar */}
         <div className="shrink-0 border-b border-border/70 bg-muted/40 backdrop-blur supports-backdrop-filter:bg-muted/30">
           <ReaderTabs
             activeTabId={readerState.activeTabId}
@@ -1012,41 +1011,8 @@ export function MarkdownReader() {
             tabs={readerState.tabs}
           />
 
-          <div className="flex items-center gap-1.5 px-2.5 py-2 sm:px-3">
-            <div className="hidden items-center mr-1.5 sm:flex">
-              {/* Brand mark: dark-colored variant in light mode, teal in dark mode. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt="Markdown Reader"
-                className="size-6 object-contain dark:hidden"
-                src="/assets/logo-mark-dark.svg"
-              />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt=""
-                aria-hidden="true"
-                className="hidden size-6 object-contain dark:block"
-                src="/assets/logo-mark.svg"
-              />
-            </div>
-
-            {/* Address bar: empty state only — the active tab already names the open file */}
-            {!file ? (
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border/80 bg-background/90 px-3 py-1.5 shadow-xs ring-1 ring-foreground/5">
-                <Search
-                  className="size-4 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <span className="truncate text-sm font-medium">
-                  Markdown Reader
-                </span>
-                <span className="ml-auto hidden shrink-0 truncate text-xs text-muted-foreground md:inline">
-                  Choose, drop, or paste markdown to start
-                </span>
-              </div>
-            ) : null}
-
-            {file ? (
+          {file ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-2 sm:px-3">
               <ReadAloudToolbar
                 activeTabId={activeTab.id}
                 chunks={activeModel.readAloudChunks}
@@ -1055,27 +1021,25 @@ export function MarkdownReader() {
                 reader={reader}
                 sections={activeModel.readAloudSections}
               />
-            ) : null}
 
-            {canUseSplitView ? (
-              <Button
-                aria-label={splitTab ? "Close split view" : "Open split view"}
-                aria-pressed={Boolean(splitTab)}
-                className="hidden shrink-0 lg:inline-flex"
-                onClick={toggleSplitView}
-                size="icon"
-                type="button"
-                variant="secondary"
-              >
-                {splitTab ? (
-                  <PanelRightClose aria-hidden="true" />
-                ) : (
-                  <Columns2 aria-hidden="true" />
-                )}
-              </Button>
-            ) : null}
+              {canUseSplitView ? (
+                <Button
+                  aria-label={splitTab ? "Close split view" : "Open split view"}
+                  aria-pressed={Boolean(splitTab)}
+                  className="hidden shrink-0 lg:inline-flex"
+                  onClick={toggleSplitView}
+                  size="icon"
+                  type="button"
+                  variant="secondary"
+                >
+                  {splitTab ? (
+                    <PanelRightClose aria-hidden="true" />
+                  ) : (
+                    <Columns2 aria-hidden="true" />
+                  )}
+                </Button>
+              ) : null}
 
-            {file ? (
               <div className="flex shrink-0 items-center gap-1.5">
                 <Button
                   aria-label="Open a Markdown file"
@@ -1108,41 +1072,39 @@ export function MarkdownReader() {
                   <Download aria-hidden="true" />
                 </Button>
               </div>
-            ) : null}
 
-            <div
-              className={cn(
-                "flex shrink-0 items-center gap-1.5",
-                splitTab && "lg:hidden",
-              )}
-            >
-              <TabsList aria-label="Document view" className="shrink-0">
-                <TabsTrigger aria-label="Preview" value="preview">
-                  <BookOpen aria-hidden="true" />
-                  <span className="hidden xl:inline">Preview</span>
-                </TabsTrigger>
-                {file ? (
+              <div
+                className={cn(
+                  "flex shrink-0 items-center gap-1.5",
+                  splitTab && "lg:hidden",
+                )}
+              >
+                <TabsList aria-label="Document view" className="shrink-0">
+                  <TabsTrigger aria-label="Preview" value="preview">
+                    <BookOpen aria-hidden="true" />
+                    <span className="hidden xl:inline">Preview</span>
+                  </TabsTrigger>
                   <TabsTrigger aria-label="Source" value="source">
                     <Braces aria-hidden="true" />
                     <span className="hidden xl:inline">Source</span>
                   </TabsTrigger>
-                ) : null}
-              </TabsList>
+                </TabsList>
 
-              {file && !splitTab ? (
-                documentView === "preview" ? (
-                  <EditPreviewButton
-                    isEditing={editingTabIds.has(activeTab.id)}
-                    onEditingChange={(isEditing) =>
-                      setTabEditing(activeTab.id, isEditing)
-                    }
-                  />
-                ) : (
-                  <CopySourceButton content={file.content} />
-                )
-              ) : null}
+                {!splitTab ? (
+                  documentView === "preview" ? (
+                    <EditPreviewButton
+                      isEditing={editingTabIds.has(activeTab.id)}
+                      onEditingChange={(isEditing) =>
+                        setTabEditing(activeTab.id, isEditing)
+                      }
+                    />
+                  ) : (
+                    <CopySourceButton content={file.content} />
+                  )
+                ) : null}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {file ? (
             <ReadAloudToolbar
