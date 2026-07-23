@@ -203,7 +203,7 @@ export function ReaderTabs({
           return (
             <div
               className={cn(
-                "group relative flex min-w-36 max-w-56 shrink-0 items-center rounded-t-lg border border-b-0 text-sm transition",
+                "group relative flex min-w-24 max-w-56 flex-[1_1_14rem] items-center rounded-t-lg border border-b-0 text-sm transition",
                 isActive
                   ? "z-10 border-border/70 bg-background text-foreground -mb-px pb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)]"
                   : "border-transparent bg-background/40 text-muted-foreground hover:bg-background/70 hover:text-foreground",
@@ -273,25 +273,25 @@ export function ReaderTabs({
             </div>
           );
         })}
-
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                aria-label="New reader tab"
-                className="mb-1 ml-0.5 size-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground"
-                onClick={onNewTab}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              />
-            }
-          >
-            <Plus aria-hidden="true" />
-          </TooltipTrigger>
-          <TooltipContent>New tab</TooltipContent>
-        </Tooltip>
       </div>
+
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              aria-label="New reader tab"
+              className="mb-1 size-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground"
+              onClick={onNewTab}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            />
+          }
+        >
+          <Plus aria-hidden="true" />
+        </TooltipTrigger>
+        <TooltipContent>New tab</TooltipContent>
+      </Tooltip>
 
       <ReaderStorageMenu
         onClearSession={onClearSession}
