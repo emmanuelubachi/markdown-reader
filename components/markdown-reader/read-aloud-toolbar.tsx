@@ -182,6 +182,7 @@ export function ReadAloudToolbar({
         <TooltipTrigger
           render={
             <Button
+              aria-keyshortcuts="ArrowLeft"
               aria-label="Rewind one passage"
               className="size-7 shrink-0 rounded-full"
               disabled={!canSeek || atStart}
@@ -194,7 +195,7 @@ export function ReadAloudToolbar({
         >
           <SkipBack aria-hidden="true" />
         </TooltipTrigger>
-        <TooltipContent>Previous passage</TooltipContent>
+        <TooltipContent>Previous passage (←)</TooltipContent>
       </Tooltip>
 
       <Tooltip>
@@ -248,6 +249,7 @@ export function ReadAloudToolbar({
         <TooltipTrigger
           render={
             <Button
+              aria-keyshortcuts="ArrowRight"
               aria-label="Skip to next passage"
               className="size-7 shrink-0 rounded-full"
               disabled={!canSeek || atEnd}
@@ -260,7 +262,7 @@ export function ReadAloudToolbar({
         >
           <SkipForward aria-hidden="true" />
         </TooltipTrigger>
-        <TooltipContent>Next passage</TooltipContent>
+        <TooltipContent>Next passage (→)</TooltipContent>
       </Tooltip>
 
       <Tooltip>

@@ -103,6 +103,19 @@ type PersistenceStatus =
 
 const SAVE_INDICATOR_TIMEOUT_MS = 2500;
 
+function isReadAloudShortcutTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    isEditablePasteTarget(target) ||
+    target.closest(
+      "select, [role='combobox'], [role='listbox'], [role='menu'], [role='slider']",
+    ) !== null
+  );
+}
+
 export function MarkdownReader() {
   const inputRef = useRef<HTMLInputElement>(null);
   const didChangeBeforeRestoreRef = useRef(false);
@@ -175,6 +188,43 @@ export function MarkdownReader() {
   // Lifted here (instead of inside the toolbar) so playback survives tab
   // switches — MarkdownReader stays mounted while the toolbar remounts per tab.
   const reader = useReadAloud();
+
+  useEffect(() => {
+    const sessionActive =
+      reader.status === "playing" ||
+      reader.status === "paused" ||
+      reader.status === "loading";
+
+    if (reader.sourceTabId == null || !sessionActive || reader.total === 0) {
+      return;
+    }
+
+    function handleReadAloudKeyDown(event: globalThis.KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        isReadAloudShortcutTarget(event.target)
+      ) {
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        reader.seekBy(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        reader.seekBy(1);
+      }
+    }
+
+    window.addEventListener("keydown", handleReadAloudKeyDown);
+
+    return () => window.removeEventListener("keydown", handleReadAloudKeyDown);
+  }, [reader]);
 
   const clearSaveIndicatorTimeout = useCallback(() => {
     if (saveIndicatorTimeoutRef.current === null) {

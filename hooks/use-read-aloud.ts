@@ -451,7 +451,13 @@ export function useReadAloud() {
   // Step relative to the live play head (not React state), so rapid prev/next
   // clicks accumulate correctly instead of collapsing onto one stale index.
   function seekBy(delta: number) {
-    seek(playbackIndexRef.current + delta);
+    const targetIndex = playbackIndexRef.current + delta;
+
+    if (targetIndex < 0 || targetIndex >= chunksRef.current.length) {
+      return;
+    }
+
+    seek(targetIndex);
   }
 
   function startFromSelection(readableChunks: string[], sourceId: string) {
