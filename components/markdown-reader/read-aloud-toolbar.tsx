@@ -202,6 +202,7 @@ export function ReadAloudToolbar({
         <TooltipTrigger
           render={
             <Button
+              aria-keyshortcuts="Space"
               aria-label={
                 isPlaying
                   ? "Pause reading"
@@ -236,12 +237,12 @@ export function ReadAloudToolbar({
         </TooltipTrigger>
         <TooltipContent>
           {isPlaying
-            ? "Pause"
+            ? "Pause (Space)"
             : isPaused
-              ? "Resume"
+              ? "Resume (Space)"
               : isLoading
                 ? "Preparing voice"
-                : "Read from selection"}
+                : "Read from selection (Space)"}
         </TooltipContent>
       </Tooltip>
 

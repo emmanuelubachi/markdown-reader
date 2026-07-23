@@ -116,6 +116,16 @@ function isReadAloudShortcutTarget(target: EventTarget | null) {
   );
 }
 
+function isSpacebarShortcutTarget(target: EventTarget | null) {
+  return (
+    isReadAloudShortcutTarget(target) ||
+    (target instanceof HTMLElement &&
+      target.closest(
+        "a[href], button, summary, [role='button'], [role='checkbox'], [role='radio'], [role='switch'], [role='tab']",
+      ) !== null)
+  );
+}
+
 export function MarkdownReader() {
   const inputRef = useRef<HTMLInputElement>(null);
   const didChangeBeforeRestoreRef = useRef(false);
@@ -191,13 +201,11 @@ export function MarkdownReader() {
 
   useEffect(() => {
     const sessionActive =
-      reader.status === "playing" ||
-      reader.status === "paused" ||
-      reader.status === "loading";
-
-    if (reader.sourceTabId == null || !sessionActive || reader.total === 0) {
-      return;
-    }
+      reader.sourceTabId != null &&
+      reader.total > 0 &&
+      (reader.status === "playing" ||
+        reader.status === "paused" ||
+        reader.status === "loading");
 
     function handleReadAloudKeyDown(event: globalThis.KeyboardEvent) {
       if (
@@ -212,19 +220,40 @@ export function MarkdownReader() {
         return;
       }
 
-      if (event.key === "ArrowLeft") {
+      if (event.key === "ArrowLeft" && sessionActive) {
         event.preventDefault();
         reader.seekBy(-1);
-      } else if (event.key === "ArrowRight") {
+      } else if (event.key === "ArrowRight" && sessionActive) {
         event.preventDefault();
         reader.seekBy(1);
+      } else if (
+        (event.key === " " || event.code === "Space") &&
+        !event.repeat &&
+        !isSpacebarShortcutTarget(event.target)
+      ) {
+        if (reader.status === "playing") {
+          event.preventDefault();
+          reader.pause();
+        } else if (reader.status === "paused") {
+          event.preventDefault();
+          reader.resume();
+        } else if (
+          reader.status === "idle" &&
+          activeModel.readAloudChunks.length > 0
+        ) {
+          event.preventDefault();
+          reader.startFromSelection(
+            activeModel.readAloudChunks,
+            activeTab.id,
+          );
+        }
       }
     }
 
     window.addEventListener("keydown", handleReadAloudKeyDown);
 
     return () => window.removeEventListener("keydown", handleReadAloudKeyDown);
-  }, [reader]);
+  }, [activeModel.readAloudChunks, activeTab.id, reader]);
 
   const clearSaveIndicatorTimeout = useCallback(() => {
     if (saveIndicatorTimeoutRef.current === null) {
