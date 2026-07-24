@@ -277,7 +277,7 @@ export function ReaderTabs({
             <div
               ref={isActive ? activeTabRef : undefined}
               className={cn(
-                "group relative flex min-w-24 max-w-56 max-h-8 -translate-y-0.5 flex-[1_1_14rem] items-center rounded-t-lg border border-b-0 text-sm transition",
+                "group relative flex min-w-24 max-w-56 -translate-y-0.5 flex-[1_1_14rem] items-center rounded-t-lg border border-b-0 text-xs transition",
                 isActive
                   ? "z-10 border-border/70 text-foreground -mb-px translate-y-0 pb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)] bg-card"
                   : "border-none bg-card/80 text-muted-foreground hover:bg-background/60 hover:text-foreground",
