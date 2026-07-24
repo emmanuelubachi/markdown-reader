@@ -61,10 +61,7 @@ type TabDropTarget = {
 
 const READER_TAB_DRAG_TYPE = "application/x-markdown-reader-tab";
 
-function scrollTabIntoView(
-  tabList: HTMLDivElement,
-  activeTab: HTMLDivElement,
-) {
+function scrollTabIntoView(tabList: HTMLDivElement, activeTab: HTMLDivElement) {
   const tabListBounds = tabList.getBoundingClientRect();
   const activeTabBounds = activeTab.getBoundingClientRect();
   let nextScrollLeft: number | null = null;
@@ -87,6 +84,7 @@ function scrollTabIntoView(
 
 export function ReaderTabs({
   activeTabId,
+  className,
   onClearSession,
   onCloseTab,
   onNewTab,
@@ -96,6 +94,7 @@ export function ReaderTabs({
   tabs,
 }: {
   activeTabId: string;
+  className?: string;
   onClearSession: () => void;
   onCloseTab: (tabId: string) => void;
   onNewTab: () => void;
@@ -122,8 +121,7 @@ export function ReaderTabs({
       return;
     }
 
-    const scrollActiveTabIntoView = () =>
-      scrollTabIntoView(tabList, activeTab);
+    const scrollActiveTabIntoView = () => scrollTabIntoView(tabList, activeTab);
 
     scrollActiveTabIntoView();
 
@@ -143,7 +141,10 @@ export function ReaderTabs({
     setDropTarget(null);
   }
 
-  function handleTabDragStart(event: DragEvent<HTMLButtonElement>, tabId: string) {
+  function handleTabDragStart(
+    event: DragEvent<HTMLButtonElement>,
+    tabId: string,
+  ) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData(READER_TAB_DRAG_TYPE, tabId);
     setDraggedTabId(tabId);
@@ -240,7 +241,7 @@ export function ReaderTabs({
   }
 
   return (
-    <div className="flex items-end gap-1 px-2.5 pt-2 sm:px-3">
+    <div className={cn("flex items-end gap-1 px-2.5 pt-2 sm:px-3", className)}>
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
@@ -276,10 +277,10 @@ export function ReaderTabs({
             <div
               ref={isActive ? activeTabRef : undefined}
               className={cn(
-                "group relative flex min-w-24 max-w-56 flex-[1_1_14rem] items-center rounded-t-lg border border-b-0 text-sm transition",
+                "group relative flex min-w-24 max-w-56 max-h-8 -translate-y-0.5 flex-[1_1_14rem] items-center rounded-t-lg border border-b-0 text-sm transition",
                 isActive
-                  ? "z-10 border-border/70 bg-background text-foreground -mb-px pb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)]"
-                  : "border-transparent bg-background/40 text-muted-foreground hover:bg-background/70 hover:text-foreground",
+                  ? "z-10 border-border/70 text-foreground -mb-px translate-y-0 pb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)] bg-card"
+                  : "border-none bg-card/80 text-muted-foreground hover:bg-background/60 hover:text-foreground",
                 draggedTabId === tab.id && "opacity-45",
               )}
               key={tab.id}
@@ -291,9 +292,7 @@ export function ReaderTabs({
                   aria-hidden="true"
                   className={cn(
                     "pointer-events-none absolute inset-y-1 z-20 w-0.5 rounded-full bg-[#03444A] shadow-[0_0_0_1px_var(--background)] dark:bg-[#58D1E2]",
-                    dropTarget.placement === "before"
-                      ? "-left-1"
-                      : "-right-1",
+                    dropTarget.placement === "before" ? "-left-1" : "-right-1",
                   )}
                 />
               ) : null}

@@ -241,10 +241,7 @@ export function MarkdownReader() {
           activeModel.readAloudChunks.length > 0
         ) {
           event.preventDefault();
-          reader.startFromSelection(
-            activeModel.readAloudChunks,
-            activeTab.id,
-          );
+          reader.startFromSelection(activeModel.readAloudChunks, activeTab.id);
         }
       }
     }
@@ -999,9 +996,17 @@ export function MarkdownReader() {
         value={documentView}
       >
         {/* Browser chrome: tab strip + document-only reader toolbar */}
-        <div className="shrink-0 border-b border-border/70 bg-muted/40 backdrop-blur supports-backdrop-filter:bg-muted/30">
+        <div
+          className={cn(
+            "shrink-0 backdrop-blur supports-backdrop-filter:bg-muted dark:supports-backdrop-filter:bg-muted/70 ",
+            file && "border-b border-border/50",
+          )}
+        >
           <ReaderTabs
             activeTabId={readerState.activeTabId}
+            className={
+              file ? undefined : "shadow-[inset_0_-1px_0_var(--border)]"
+            }
             onClearSession={handleClearReaderSession}
             onCloseTab={closeTab}
             onNewTab={createNewTab}
