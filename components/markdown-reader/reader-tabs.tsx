@@ -283,7 +283,7 @@ export function ReaderTabs({
                           "text-muted-foreground hover:text-foreground",
                           tabGroup
                             ? cn(
-                                "border-x-0 border-t-0 border-b -translate-y-0",
+                                "border-x-0 border-t-0 border-b translate-y-0",
                                 TAB_GROUP_INACTIVE_BORDER_CLASSES[
                                   tabGroup.color
                                 ],
