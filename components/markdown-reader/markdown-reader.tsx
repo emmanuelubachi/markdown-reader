@@ -998,7 +998,7 @@ export function MarkdownReader() {
         {/* Browser chrome: tab strip + document-only reader toolbar */}
         <div
           className={cn(
-            "shrink-0 backdrop-blur supports-backdrop-filter:bg-muted dark:supports-backdrop-filter:bg-muted/70 ",
+            "shrink-0 backdrop-blur supports-backdrop-filter:bg-muted dark:supports-backdrop-filter:bg-muted/70 border-none ",
             file && "border-b border-border/50",
           )}
         >
