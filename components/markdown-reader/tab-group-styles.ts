@@ -10,15 +10,15 @@ export const TAB_GROUP_COLOR_LABELS: Record<ReaderTabGroupColor, string> = {
 };
 
 export const TAB_GROUP_PILL_CLASSES: Record<ReaderTabGroupColor, string> = {
-  blue: "border-blue-500/40 bg-blue-500/16 text-blue-800 dark:text-blue-200",
-  cyan: "border-cyan-500/40 bg-cyan-500/16 text-cyan-800 dark:text-cyan-200",
+  blue: "bg-blue-500/16 text-blue-800 dark:text-blue-200",
+  cyan: "bg-cyan-500/16 text-cyan-800 dark:text-cyan-200",
   green:
-    "border-emerald-500/40 bg-emerald-500/16 text-emerald-800 dark:text-emerald-200",
+    "bg-emerald-500/16 text-emerald-800 dark:text-emerald-200",
   orange:
-    "border-orange-500/40 bg-orange-500/16 text-orange-800 dark:text-orange-200",
-  pink: "border-pink-500/40 bg-pink-500/16 text-pink-800 dark:text-pink-200",
+    "bg-orange-500/16 text-orange-800 dark:text-orange-200",
+  pink: "bg-pink-500/16 text-pink-800 dark:text-pink-200",
   purple:
-    "border-purple-500/40 bg-purple-500/16 text-purple-800 dark:text-purple-200",
+    "bg-purple-500/16 text-purple-800 dark:text-purple-200",
 };
 
 export const TAB_GROUP_DOT_CLASSES: Record<ReaderTabGroupColor, string> = {
@@ -30,16 +30,28 @@ export const TAB_GROUP_DOT_CLASSES: Record<ReaderTabGroupColor, string> = {
   purple: "bg-purple-500",
 };
 
-export const TAB_GROUP_TAB_ACCENT_CLASSES: Record<
+export const TAB_GROUP_ACTIVE_BORDER_CLASSES: Record<
   ReaderTabGroupColor,
   string
 > = {
-  blue: "after:bg-blue-500",
-  cyan: "after:bg-cyan-500",
-  green: "after:bg-emerald-500",
-  orange: "after:bg-orange-500",
-  pink: "after:bg-pink-500",
-  purple: "after:bg-purple-500",
+  blue: "border-blue-500/75",
+  cyan: "border-cyan-500/75",
+  green: "border-emerald-500/75",
+  orange: "border-orange-500/75",
+  pink: "border-pink-500/75",
+  purple: "border-purple-500/75",
+};
+
+export const TAB_GROUP_INACTIVE_BORDER_CLASSES: Record<
+  ReaderTabGroupColor,
+  string
+> = {
+  blue: "border-b-blue-500/75",
+  cyan: "border-b-cyan-500/75",
+  green: "border-b-emerald-500/75",
+  orange: "border-b-orange-500/75",
+  pink: "border-b-pink-500/75",
+  purple: "border-b-purple-500/75",
 };
 
 export const TAB_GROUP_TAB_TINT_CLASSES: Record<

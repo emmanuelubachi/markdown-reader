@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  Fragment,
-  useState,
-  type DragEvent,
-  type KeyboardEvent,
-} from "react";
+import { Fragment, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Plus } from "lucide-react";
 
 import { ModeToggle } from "@/components/mode-toggle";
@@ -13,7 +8,8 @@ import { ReaderStorageMenu } from "@/components/markdown-reader/reader-storage-m
 import { ReaderTabGroupLabel } from "@/components/markdown-reader/reader-tab-group-label";
 import { ReaderTabTrigger } from "@/components/markdown-reader/reader-tab-trigger";
 import {
-  TAB_GROUP_TAB_ACCENT_CLASSES,
+  TAB_GROUP_ACTIVE_BORDER_CLASSES,
+  TAB_GROUP_INACTIVE_BORDER_CLASSES,
   TAB_GROUP_TAB_TINT_CLASSES,
 } from "@/components/markdown-reader/tab-group-styles";
 import { Button } from "@/components/ui/button";
@@ -78,9 +74,7 @@ export function ReaderTabs({
   onUngroupTabs: (groupId: string) => void;
   onUpdateTabGroup: (
     groupId: string,
-    updates: Partial<
-      Pick<ReaderTabGroup, "collapsed" | "color" | "name">
-    >,
+    updates: Partial<Pick<ReaderTabGroup, "collapsed" | "color" | "name">>,
   ) => void;
   persistenceStatus: ReaderPersistenceStatus;
   tabs: ReaderTab[];
@@ -262,13 +256,10 @@ export function ReaderTabs({
                 >
                   <ReaderTabGroupLabel
                     group={tabGroup}
-                    hasActiveTab={groupHasActiveTab}
                     onColorChange={(color: ReaderTabGroupColor) =>
                       onUpdateTabGroup(tabGroup.id, { color })
                     }
-                    onRename={(name) =>
-                      onUpdateTabGroup(tabGroup.id, { name })
-                    }
+                    onRename={(name) => onUpdateTabGroup(tabGroup.id, { name })}
                     onToggle={() => onToggleTabGroup(tabGroup.id)}
                     onUngroup={() => onUngroupTabs(tabGroup.id)}
                     tabCount={groupTabs.length}
@@ -282,17 +273,26 @@ export function ReaderTabs({
                   className={cn(
                     "group relative flex min-w-24 max-w-56 -translate-y-0.5 flex-[1_1_14rem] items-center rounded-t-lg border border-b-0 text-xs transition",
                     isActive
-                      ? "z-10 border-border/70 text-foreground -mb-px translate-y-0 pb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)] bg-card"
-                      : cn(
-                          "border-none text-muted-foreground hover:text-foreground",
+                      ? cn(
+                          "z-10 text-foreground -mb-px translate-y-0 pb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)] bg-card",
                           tabGroup
-                            ? TAB_GROUP_TAB_TINT_CLASSES[tabGroup.color]
+                            ? TAB_GROUP_ACTIVE_BORDER_CLASSES[tabGroup.color]
+                            : "border-border/70",
+                        )
+                      : cn(
+                          "text-muted-foreground hover:text-foreground",
+                          tabGroup
+                            ? cn(
+                                "border-x-0 border-t-0 border-b -translate-y-0",
+                                TAB_GROUP_INACTIVE_BORDER_CLASSES[
+                                  tabGroup.color
+                                ],
+                                TAB_GROUP_TAB_TINT_CLASSES[tabGroup.color],
+                              )
                             : "bg-card/80 hover:bg-background/60",
+                          !tabGroup && "border-none",
                         ),
-                    tabGroup &&
-                      "-ml-0.5 after:pointer-events-none after:absolute after:inset-x-0 after:top-0 after:h-px after:opacity-80",
-                    tabGroup &&
-                      TAB_GROUP_TAB_ACCENT_CLASSES[tabGroup.color],
+                    tabGroup && "-ml-0.5",
                     draggedTabId === tab.id && "opacity-45",
                   )}
                   onDragOver={(event) => handleTabDragOver(event, tab.id)}
@@ -318,12 +318,8 @@ export function ReaderTabs({
                     onClose={() => onCloseTab(tab.id)}
                     onCreateGroup={() => onCreateTabGroup(tab.id)}
                     onDragEnd={resetDragState}
-                    onDragStart={(event) =>
-                      handleTabDragStart(event, tab.id)
-                    }
-                    onKeyDown={(event) =>
-                      handleTabKeyDown(event, tab, index)
-                    }
+                    onDragStart={(event) => handleTabDragStart(event, tab.id)}
+                    onKeyDown={(event) => handleTabKeyDown(event, tab, index)}
                     onMoveToGroup={(groupId) =>
                       onMoveTabToGroup(tab.id, groupId)
                     }

@@ -35,7 +35,6 @@ import { cn } from "@/lib/utils";
 
 export function ReaderTabGroupLabel({
   group,
-  hasActiveTab,
   onColorChange,
   onRename,
   onToggle,
@@ -43,7 +42,6 @@ export function ReaderTabGroupLabel({
   tabCount,
 }: {
   group: ReaderTabGroup;
-  hasActiveTab: boolean;
   onColorChange: (color: ReaderTabGroupColor) => void;
   onRename: (name: string) => void;
   onToggle: () => void;
@@ -99,7 +97,7 @@ export function ReaderTabGroupLabel({
     return (
       <div
         className={cn(
-          "mb-1 flex h-7 w-32 shrink-0 items-center rounded-md border px-2.5 shadow-xs",
+          "mx-0.5 mb-1 flex h-6 w-28 shrink-0 items-center rounded px-2",
           TAB_GROUP_PILL_CLASSES[group.color],
         )}
       >
@@ -140,9 +138,8 @@ export function ReaderTabGroupLabel({
             aria-keyshortcuts="F2"
             aria-label={`${group.name} group, ${tabCount} tab${tabCount === 1 ? "" : "s"}`}
             className={cn(
-              "mb-1 flex h-7 max-w-36 shrink-0 items-center rounded-md border px-2.5 text-xs font-semibold outline-none shadow-xs transition-[background-color,border-color,box-shadow,filter] hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring/40 dark:hover:brightness-110",
+              "mx-0.5 mb-1 flex h-6 max-w-32 shrink-0 items-center rounded px-2 text-[11px] font-semibold outline-none transition-[background-color,filter] hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:hover:brightness-110",
               TAB_GROUP_PILL_CLASSES[group.color],
-              hasActiveTab && "ring-2 ring-ring/35",
             )}
             onClick={onToggle}
             onDoubleClick={(event) => {
