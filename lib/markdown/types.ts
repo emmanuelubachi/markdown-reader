@@ -52,16 +52,33 @@ export type LoadedFile = {
 
 export type ReaderView = "preview" | "source";
 
+export type ReaderTabGroupColor =
+  | "blue"
+  | "cyan"
+  | "green"
+  | "orange"
+  | "pink"
+  | "purple";
+
+export type ReaderTabGroup = {
+  collapsed: boolean;
+  color: ReaderTabGroupColor;
+  id: string;
+  name: string;
+};
+
 export type ReaderTab = {
   activeHeadingId: null | string;
   error: null | string;
   file: LoadedFile | null;
+  groupId: null | string;
   id: string;
   view: ReaderView;
 };
 
 export type ReaderState = {
   activeTabId: string;
+  groups: ReaderTabGroup[];
   tabs: ReaderTab[];
 };
 

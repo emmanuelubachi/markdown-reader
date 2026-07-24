@@ -7,34 +7,58 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from "react";
-import { AlertCircle, FileText, X } from "lucide-react";
+import {
+  AlertCircle,
+  FileInput,
+  FileText,
+  FolderPlus,
+  PencilLine,
+  Ungroup,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { normalizeMarkdownDocumentName } from "@/lib/markdown/document";
-import type { ReaderTab } from "@/lib/markdown/types";
+import type { ReaderTab, ReaderTabGroup } from "@/lib/markdown/types";
 import { cn } from "@/lib/utils";
 
 export function ReaderTabTrigger({
   canClose,
   canDrag,
+  groups,
   isActive,
   label,
   onClose,
   onDragEnd,
   onDragStart,
+  onCreateGroup,
   onKeyDown,
+  onMoveToGroup,
   onRename,
   onSelect,
   tab,
 }: {
   canClose: boolean;
   canDrag: boolean;
+  groups: ReaderTabGroup[];
   isActive: boolean;
   label: string;
   onClose: () => void;
   onDragEnd: () => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
+  onCreateGroup: () => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  onMoveToGroup: (groupId: null | string) => void;
   onRename: (name: string) => void;
   onSelect: () => void;
   tab: ReaderTab;
@@ -43,6 +67,7 @@ export function ReaderTabTrigger({
   const [draftName, setDraftName] = useState("");
   const [isInvalid, setIsInvalid] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
+  const availableGroups = groups.filter((group) => group.id !== tab.groupId);
 
   useEffect(() => {
     const input = inputRef.current;
@@ -156,43 +181,92 @@ export function ReaderTabTrigger({
           ) : null}
         </div>
       ) : (
-        <button
-          aria-keyshortcuts={
-            tab.file
-              ? "F2 Alt+Shift+ArrowLeft Alt+Shift+ArrowRight"
-              : "Alt+Shift+ArrowLeft Alt+Shift+ArrowRight"
-          }
-          aria-selected={isActive}
-          className="flex min-w-0 flex-1 cursor-grab items-center gap-2 rounded-t-lg py-2 pl-3 pr-1.5 text-left active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
-          draggable={canDrag}
-          onClick={onSelect}
-          onDoubleClick={(event) => {
-            event.preventDefault();
-            beginRenaming();
-          }}
-          onDragEnd={onDragEnd}
-          onDragStart={onDragStart}
-          onKeyDown={(event) => {
-            if (event.key === "F2" && tab.file) {
-              event.preventDefault();
-              event.stopPropagation();
-              beginRenaming();
-              return;
-            }
+        <ContextMenu>
+          <ContextMenuTrigger
+            render={
+              <button
+                aria-keyshortcuts={
+                  tab.file
+                    ? "F2 Alt+Shift+ArrowLeft Alt+Shift+ArrowRight"
+                    : "Alt+Shift+ArrowLeft Alt+Shift+ArrowRight"
+                }
+                aria-selected={isActive}
+                className="flex min-w-0 flex-1 cursor-grab items-center gap-2 rounded-t-lg py-2 pl-3 pr-1.5 text-left active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                draggable={canDrag}
+                onClick={onSelect}
+                onDoubleClick={(event) => {
+                  event.preventDefault();
+                  beginRenaming();
+                }}
+                onDragEnd={onDragEnd}
+                onDragStart={onDragStart}
+                onKeyDown={(event) => {
+                  if (event.key === "F2" && tab.file) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    beginRenaming();
+                    return;
+                  }
 
-            onKeyDown(event);
-          }}
-          role="tab"
-          title={
-            tab.file
-              ? `${label} — double-click or press F2 to rename${canDrag ? " · drag to reorder" : ""}`
-              : `${label}${canDrag ? " — drag to reorder" : ""}`
-          }
-          type="button"
-        >
-          {icon}
-          <span className="truncate">{label}</span>
-        </button>
+                  onKeyDown(event);
+                }}
+                role="tab"
+                title={
+                  tab.file
+                    ? `${label} — double-click or press F2 to rename${canDrag ? " · drag to reorder" : ""}`
+                    : `${label}${canDrag ? " — drag to reorder" : ""}`
+                }
+                type="button"
+              />
+            }
+          >
+            {icon}
+            <span className="truncate">{label}</span>
+          </ContextMenuTrigger>
+
+          <ContextMenuContent>
+            {tab.file ? (
+              <>
+                <ContextMenuItem onClick={beginRenaming}>
+                  <PencilLine aria-hidden="true" />
+                  Rename document
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+              </>
+            ) : null}
+            <ContextMenuItem onClick={onCreateGroup}>
+              <FolderPlus aria-hidden="true" />
+              Add to new group
+            </ContextMenuItem>
+            {availableGroups.length > 0 ? (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>
+                  <FileInput aria-hidden="true" />
+                  Move to group
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent>
+                  {availableGroups.map((group) => (
+                    <ContextMenuItem
+                      key={group.id}
+                      onClick={() => onMoveToGroup(group.id)}
+                    >
+                      {group.name}
+                    </ContextMenuItem>
+                  ))}
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            ) : null}
+            {tab.groupId ? (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuItem onClick={() => onMoveToGroup(null)}>
+                  <Ungroup aria-hidden="true" />
+                  Remove from group
+                </ContextMenuItem>
+              </>
+            ) : null}
+          </ContextMenuContent>
+        </ContextMenu>
       )}
 
       {canClose ? (

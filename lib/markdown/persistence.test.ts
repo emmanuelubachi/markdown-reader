@@ -24,11 +24,16 @@ const file: LoadedFile = {
   source: "file",
 };
 
-function createTab(id: string, tabFile: LoadedFile | null = null): ReaderTab {
+function createTab(
+  id: string,
+  tabFile: LoadedFile | null = null,
+  groupId: null | string = null,
+): ReaderTab {
   return {
     activeHeadingId: null,
     error: null,
     file: tabFile,
+    groupId,
     id,
     view: tabFile ? "source" : "preview",
   };
@@ -104,7 +109,18 @@ describe("saveReaderSession and loadReaderSession", () => {
   it("round-trips a reader session", () => {
     const state: ReaderState = {
       activeTabId: "with-file",
-      tabs: [createTab("with-file", file), createTab("empty")],
+      groups: [
+        {
+          collapsed: false,
+          color: "cyan",
+          id: "group-a",
+          name: "Research",
+        },
+      ],
+      tabs: [
+        createTab("with-file", file, "group-a"),
+        createTab("empty", null, "group-a"),
+      ],
     };
 
     return saveReaderSession(state).then(async (savedAt) => {
@@ -123,7 +139,7 @@ describe("saveReaderSession and loadReaderSession", () => {
 
   it("refuses to save a state with no usable tabs", async () => {
     await expect(
-      saveReaderSession({ activeTabId: "x", tabs: [] }),
+      saveReaderSession({ activeTabId: "x", groups: [], tabs: [] }),
     ).resolves.toBeNull();
     await expect(loadReaderSession()).resolves.toBeNull();
   });
@@ -152,6 +168,8 @@ describe("saveReaderSession and loadReaderSession", () => {
 
     expect(session?.state.tabs.map((tab) => tab.id)).toEqual(["kept"]);
     expect(session?.state.activeTabId).toBe("kept");
+    expect(session?.state.groups).toEqual([]);
+    expect(session?.state.tabs[0]?.groupId).toBeNull();
   });
 
   it("normalizes a partially stored file and resets the view of empty tabs", async () => {
@@ -195,10 +213,12 @@ describe("saveReaderSession and loadReaderSession", () => {
   it("never lets an older save overwrite a newer record", async () => {
     const firstSavedAt = await saveReaderSession({
       activeTabId: "a",
+      groups: [],
       tabs: [createTab("a")],
     });
     const newerState = {
       activeTabId: "newer",
+      groups: [],
       tabs: [createTab("newer")],
     };
 
@@ -209,6 +229,7 @@ describe("saveReaderSession and loadReaderSession", () => {
     });
     await saveReaderSession({
       activeTabId: "older",
+      groups: [],
       tabs: [createTab("older")],
     });
 
@@ -221,6 +242,7 @@ describe("saveReaderSession and loadReaderSession", () => {
   it("restores the separately remembered active tab when it still exists", async () => {
     await saveReaderSession({
       activeTabId: "a",
+      groups: [],
       tabs: [createTab("a"), createTab("b")],
     });
 
@@ -238,7 +260,11 @@ describe("saveReaderSession and loadReaderSession", () => {
 
 describe("clearReaderSession", () => {
   it("removes the stored session and the remembered active tab", async () => {
-    await saveReaderSession({ activeTabId: "a", tabs: [createTab("a", file)] });
+    await saveReaderSession({
+      activeTabId: "a",
+      groups: [],
+      tabs: [createTab("a", file)],
+    });
     expect(localStorage.getItem(ACTIVE_TAB_STORAGE_KEY)).toBe("a");
 
     await clearReaderSession();

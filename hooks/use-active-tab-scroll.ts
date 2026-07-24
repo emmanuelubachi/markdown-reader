@@ -2,11 +2,12 @@
 
 import { useEffect, useRef } from "react";
 
-import type { ReaderTab } from "@/lib/markdown/types";
+import type { ReaderTab, ReaderTabGroup } from "@/lib/markdown/types";
 
 export function useActiveTabScroll(
   activeTabId: string,
   tabs: ReaderTab[],
+  groups: ReaderTabGroup[] = [],
 ) {
   const activeTabRef = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
@@ -33,7 +34,7 @@ export function useActiveTabScroll(
     resizeObserver.observe(tabList);
 
     return () => resizeObserver.disconnect();
-  }, [activeTabId, tabs]);
+  }, [activeTabId, groups, tabs]);
 
   return { activeTabRef, tabListRef };
 }

@@ -35,6 +35,14 @@ import {
   isEditablePasteTarget,
   normalizeMarkdownDocumentName,
 } from "@/lib/markdown/document";
+import {
+  createTabGroupForTab,
+  moveTabToGroup,
+  pruneEmptyTabGroups,
+  ungroupTabs,
+  updateTabGroup,
+} from "@/lib/markdown/tab-groups";
+import type { ReaderTabGroup } from "@/lib/markdown/types";
 import { cn } from "@/lib/utils";
 
 export function MarkdownReader() {
@@ -175,6 +183,7 @@ export function MarkdownReader() {
 
     commitReaderState(
       {
+        ...currentState,
         activeTabId: nextTab.id,
         tabs: [...currentState.tabs, nextTab],
       },
@@ -202,6 +211,57 @@ export function MarkdownReader() {
       },
       { persistImmediately: true },
     );
+  }
+
+  function createTabGroup(tabId: string) {
+    const currentState = getCurrentReaderState();
+    const nextState = createTabGroupForTab(currentState, tabId);
+
+    if (nextState !== currentState) {
+      commitReaderState(nextState, { persistImmediately: true });
+    }
+  }
+
+  function moveTabIntoGroup(tabId: string, groupId: null | string) {
+    const currentState = getCurrentReaderState();
+    const nextState = moveTabToGroup(currentState, tabId, groupId);
+
+    if (nextState !== currentState) {
+      commitReaderState(nextState, { persistImmediately: true });
+    }
+  }
+
+  function changeTabGroup(
+    groupId: string,
+    updates: Partial<
+      Pick<ReaderTabGroup, "collapsed" | "color" | "name">
+    >,
+  ) {
+    const currentState = getCurrentReaderState();
+    const nextState = updateTabGroup(currentState, groupId, updates);
+
+    if (nextState !== currentState) {
+      commitReaderState(nextState, { persistImmediately: true });
+    }
+  }
+
+  function toggleTabGroup(groupId: string) {
+    const group = getCurrentReaderState().groups.find(
+      (candidate) => candidate.id === groupId,
+    );
+
+    if (group) {
+      changeTabGroup(groupId, { collapsed: !group.collapsed });
+    }
+  }
+
+  function removeTabGroup(groupId: string) {
+    const currentState = getCurrentReaderState();
+    const nextState = ungroupTabs(currentState, groupId);
+
+    if (nextState !== currentState) {
+      commitReaderState(nextState, { persistImmediately: true });
+    }
   }
 
   async function handleClearReaderSession() {
@@ -263,7 +323,9 @@ export function MarkdownReader() {
 
       commitReaderState(
         {
+          ...currentState,
           activeTabId: nextTab.id,
+          groups: [],
           tabs: [nextTab],
         },
         { persistImmediately: true },
@@ -279,13 +341,14 @@ export function MarkdownReader() {
       nextTabs[0]!;
 
     commitReaderState(
-      {
+      pruneEmptyTabGroups({
+        ...currentState,
         activeTabId:
           tabId === currentState.activeTabId || !activeTabStillExists
             ? fallbackTab.id
             : currentState.activeTabId,
         tabs: nextTabs,
-      },
+      }),
       { persistImmediately: true },
     );
   }
@@ -353,12 +416,18 @@ export function MarkdownReader() {
             className={
               file ? undefined : "shadow-[inset_0_-1px_0_var(--border)]"
             }
+            groups={readerState.groups}
             onClearSession={handleClearReaderSession}
             onCloseTab={closeTab}
+            onCreateTabGroup={createTabGroup}
+            onMoveTabToGroup={moveTabIntoGroup}
             onNewTab={createNewTab}
             onReorderTab={reorderTabs}
             onRenameTab={renameDocument}
             onSelectTab={selectTab}
+            onToggleTabGroup={toggleTabGroup}
+            onUngroupTabs={removeTabGroup}
+            onUpdateTabGroup={changeTabGroup}
             persistenceStatus={persistenceStatus}
             tabs={readerState.tabs}
           />

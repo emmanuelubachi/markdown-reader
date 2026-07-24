@@ -33,6 +33,7 @@ export function createReaderTab(): ReaderTab {
     activeHeadingId: null,
     error: null,
     file: null,
+    groupId: null,
     id: createDocumentId(),
     view: "preview",
   };
@@ -45,6 +46,7 @@ export function createLoadedReaderTab(file: LoadedFile): ReaderTab {
     activeHeadingId: null,
     error: null,
     file,
+    groupId: null,
     id: createDocumentId(),
     view: "preview",
   };
@@ -104,6 +106,7 @@ export function placeLoadedFileInReaderState(
 
   if (targetTab && !targetTab.file) {
     return {
+      ...state,
       activeTabId: targetTab.id,
       tabs: state.tabs.map((tab) =>
         tab.id === targetTab.id
@@ -122,6 +125,7 @@ export function placeLoadedFileInReaderState(
   const nextTab = createLoadedReaderTab(file);
 
   return {
+    ...state,
     activeTabId: nextTab.id,
     tabs: [...state.tabs, nextTab],
   };

@@ -158,7 +158,7 @@ export function useMarkdownFiles({
     }
 
     commitReaderState(
-      { activeTabId: firstOpenedId, tabs },
+      { ...currentState, activeTabId: firstOpenedId, tabs },
       { persistImmediately: true },
     );
 

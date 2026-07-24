@@ -2,6 +2,8 @@ import type {
   LoadedFile,
   ReaderState,
   ReaderTab,
+  ReaderTabGroup,
+  ReaderTabGroupColor,
   ReaderView,
 } from "@/lib/markdown/types";
 
@@ -259,8 +261,16 @@ function normalizeReaderState(value: unknown): ReaderState | null {
     return null;
   }
 
+  const groups = (Array.isArray(value.groups) ? value.groups : [])
+    .map(normalizeReaderTabGroup)
+    .filter((group): group is ReaderTabGroup => Boolean(group))
+    .filter(
+      (group, index, allGroups) =>
+        allGroups.findIndex((candidate) => candidate.id === group.id) === index,
+    );
+  const groupIds = new Set(groups.map((group) => group.id));
   const tabs = value.tabs
-    .map(normalizeReaderTab)
+    .map((tab) => normalizeReaderTab(tab, groupIds))
     .filter((tab): tab is ReaderTab => Boolean(tab));
 
   if (tabs.length === 0) {
@@ -275,11 +285,17 @@ function normalizeReaderState(value: unknown): ReaderState | null {
 
   return {
     activeTabId,
+    groups: groups.filter((group) =>
+      tabs.some((tab) => tab.groupId === group.id),
+    ),
     tabs,
   };
 }
 
-function normalizeReaderTab(value: unknown): ReaderTab | null {
+function normalizeReaderTab(
+  value: unknown,
+  groupIds: ReadonlySet<string>,
+): ReaderTab | null {
   if (!isRecord(value) || typeof value.id !== "string") {
     return null;
   }
@@ -292,8 +308,36 @@ function normalizeReaderTab(value: unknown): ReaderTab | null {
       typeof value.activeHeadingId === "string" ? value.activeHeadingId : null,
     error: typeof value.error === "string" ? value.error : null,
     file,
+    groupId:
+      typeof value.groupId === "string" && groupIds.has(value.groupId)
+        ? value.groupId
+        : null,
     id: value.id,
     view,
+  };
+}
+
+function normalizeReaderTabGroup(value: unknown): ReaderTabGroup | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    typeof value.name !== "string" ||
+    !isReaderTabGroupColor(value.color)
+  ) {
+    return null;
+  }
+
+  const name = value.name.trim().replace(/\s+/g, " ").slice(0, 40);
+
+  if (!name) {
+    return null;
+  }
+
+  return {
+    collapsed: value.collapsed === true,
+    color: value.color,
+    id: value.id,
+    name,
   };
 }
 
@@ -339,6 +383,19 @@ function normalizeReaderView(value: unknown, file: LoadedFile | null): ReaderVie
 
 function isLoadedFileSource(value: unknown): value is LoadedFile["source"] {
   return value === "file" || value === "paste";
+}
+
+function isReaderTabGroupColor(
+  value: unknown,
+): value is ReaderTabGroupColor {
+  return (
+    value === "blue" ||
+    value === "cyan" ||
+    value === "green" ||
+    value === "orange" ||
+    value === "pink" ||
+    value === "purple"
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

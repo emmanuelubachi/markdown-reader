@@ -31,6 +31,7 @@ function createTab(id: string, file: LoadedFile | null): ReaderTab {
     activeHeadingId: "old-heading",
     error: "old error",
     file,
+    groupId: null,
     id,
     view: file ? "source" : "preview",
   };
@@ -40,6 +41,7 @@ describe("placeLoadedFileInReaderState", () => {
   it("reuses an empty target tab", () => {
     const state: ReaderState = {
       activeTabId: "empty",
+      groups: [],
       tabs: [createTab("empty", null)],
     };
 
@@ -68,6 +70,7 @@ describe("placeLoadedFileInReaderState", () => {
     const originalTab = createTab("existing", originalFile);
     const state: ReaderState = {
       activeTabId: originalTab.id,
+      groups: [],
       tabs: [originalTab],
     };
 
@@ -87,6 +90,7 @@ describe("placeLoadedFileInReaderState", () => {
   it("opens a new tab when the requested target no longer exists", () => {
     const state: ReaderState = {
       activeTabId: "existing",
+      groups: [],
       tabs: [createTab("existing", null)],
     };
 
@@ -110,6 +114,7 @@ describe("reorderReaderTabs", () => {
   ];
   const state: ReaderState = {
     activeTabId: "second",
+    groups: [],
     tabs,
   };
 

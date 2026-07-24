@@ -13,6 +13,7 @@ import {
   rememberActiveReaderTabId,
   saveReaderSession,
 } from "@/lib/markdown/persistence";
+import { pruneEmptyTabGroups } from "@/lib/markdown/tab-groups";
 import type { ReaderState, ReaderTab } from "@/lib/markdown/types";
 
 export type ReaderPersistenceStatus =
@@ -43,6 +44,7 @@ export function useReaderSession() {
 
     return {
       activeTabId: tab.id,
+      groups: [],
       tabs: [tab],
     };
   });
@@ -282,12 +284,30 @@ export function useReaderSession() {
     placement: "after" | "before",
   ) {
     const currentState = getCurrentReaderState();
-    const nextState = reorderReaderTabs(
+    const movedTab = currentState.tabs.find((tab) => tab.id === movedTabId);
+    const targetTab = currentState.tabs.find((tab) => tab.id === targetTabId);
+    let nextState = reorderReaderTabs(
       currentState,
       movedTabId,
       targetTabId,
       placement,
     );
+
+    if (
+      nextState !== currentState &&
+      movedTab &&
+      targetTab &&
+      movedTab.groupId !== targetTab.groupId
+    ) {
+      nextState = pruneEmptyTabGroups({
+        ...nextState,
+        tabs: nextState.tabs.map((tab) =>
+          tab.id === movedTabId
+            ? { ...tab, groupId: targetTab.groupId }
+            : tab,
+        ),
+      });
+    }
 
     if (nextState !== currentState) {
       commitReaderState(nextState, { persistImmediately: true });
@@ -298,6 +318,7 @@ export function useReaderSession() {
     const freshTab = createReaderTab();
     const nextState: ReaderState = {
       activeTabId: freshTab.id,
+      groups: [],
       tabs: [freshTab],
     };
 
@@ -338,8 +359,24 @@ function getReaderPersistenceSignature(state: ReaderState) {
       ? [file.name, file.size, file.lastModified, file.source].join("\u0000")
       : "";
 
-    return [tab.id, tab.view, tab.error ?? "", fileSignature].join("\u0001");
+    return [
+      tab.id,
+      tab.groupId ?? "",
+      tab.view,
+      tab.error ?? "",
+      fileSignature,
+    ].join("\u0001");
   });
+  const groupSignatures = state.groups.map((group) =>
+    [
+      group.id,
+      group.name,
+      group.color,
+      group.collapsed ? "collapsed" : "expanded",
+    ].join("\u0001"),
+  );
 
-  return [state.activeTabId, ...tabSignatures].join("\u0002");
+  return [state.activeTabId, ...groupSignatures, ...tabSignatures].join(
+    "\u0002",
+  );
 }
