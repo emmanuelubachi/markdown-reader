@@ -8,6 +8,7 @@ import {
   getPastedDocumentName,
   getReaderTabLabel,
   isMarkdownFile,
+  normalizeMarkdownDocumentName,
   placeLoadedFileInReaderState,
   reorderReaderTabs,
 } from "@/lib/markdown/document";
@@ -234,6 +235,32 @@ describe("getDownloadFileName", () => {
   it("strips unsafe characters and falls back to a default name", () => {
     expect(getDownloadFileName('a/b\\c:d*e?f"g<h>i|j')).toBe("abcdefghij.md");
     expect(getDownloadFileName("///")).toBe("document.md");
+  });
+});
+
+describe("normalizeMarkdownDocumentName", () => {
+  it("trims names and adds a markdown extension when needed", () => {
+    expect(normalizeMarkdownDocumentName("  Release notes  ")).toBe(
+      "Release notes.md",
+    );
+    expect(normalizeMarkdownDocumentName("report.txt")).toBe("report.txt.md");
+  });
+
+  it("preserves supported markdown extensions and their casing", () => {
+    expect(normalizeMarkdownDocumentName("README.MD")).toBe("README.MD");
+    expect(normalizeMarkdownDocumentName("Guide.markdown")).toBe(
+      "Guide.markdown",
+    );
+    expect(normalizeMarkdownDocumentName("Notes.mdown")).toBe("Notes.mdown");
+    expect(normalizeMarkdownDocumentName("Draft.mkd")).toBe("Draft.mkd");
+  });
+
+  it("removes unsafe filename characters and rejects empty names", () => {
+    expect(normalizeMarkdownDocumentName('a/b:c*d?e"f<g>h|i')).toBe(
+      "abcdefghi.md",
+    );
+    expect(normalizeMarkdownDocumentName("   ")).toBeNull();
+    expect(normalizeMarkdownDocumentName("///")).toBeNull();
   });
 });
 

@@ -5,10 +5,11 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from "react";
-import { AlertCircle, FileText, Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { ModeToggle } from "@/components/mode-toggle";
 import { ReaderStorageMenu } from "@/components/markdown-reader/reader-storage-menu";
+import { ReaderTabTrigger } from "@/components/markdown-reader/reader-tab-trigger";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -37,6 +38,7 @@ export function ReaderTabs({
   onCloseTab,
   onNewTab,
   onReorderTab,
+  onRenameTab,
   onSelectTab,
   persistenceStatus,
   tabs,
@@ -51,6 +53,7 @@ export function ReaderTabs({
     targetTabId: string,
     placement: TabPlacement,
   ) => void;
+  onRenameTab: (tabId: string, name: string) => void;
   onSelectTab: (tabId: string) => void;
   persistenceStatus: ReaderPersistenceStatus;
   tabs: ReaderTab[];
@@ -220,52 +223,22 @@ export function ReaderTabs({
                   )}
                 />
               ) : null}
-              <button
-                aria-keyshortcuts="Alt+Shift+ArrowLeft Alt+Shift+ArrowRight"
-                aria-selected={isActive}
-                className="flex min-w-0 flex-1 cursor-grab items-center gap-2 rounded-t-lg py-2 pl-3 pr-1.5 text-left active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
-                draggable={tabs.length > 1}
-                onClick={() => onSelectTab(tab.id)}
+              <ReaderTabTrigger
+                canClose={canClose}
+                canDrag={tabs.length > 1}
+                isActive={isActive}
+                label={label}
+                onClose={() => onCloseTab(tab.id)}
                 onDragEnd={resetDragState}
                 onDragStart={(event) => handleTabDragStart(event, tab.id)}
                 onKeyDown={(event) => handleTabKeyDown(event, tab, index)}
-                role="tab"
-                title={`${label}${tabs.length > 1 ? " — drag to reorder" : ""}`}
-                type="button"
-              >
-                {tab.error ? (
-                  <AlertCircle
-                    className="size-3.5 shrink-0 text-destructive"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <FileText
-                    className={cn(
-                      "size-3.5 shrink-0",
-                      isActive
-                        ? "text-[#03444A] dark:text-[#58D1E2]"
-                        : "text-muted-foreground",
-                    )}
-                    aria-hidden="true"
-                  />
-                )}
-                <span className="truncate">{label}</span>
-              </button>
-              {canClose ? (
-                <Button
-                  aria-label={`Close ${label}`}
-                  className={cn(
-                    "mr-1.5 size-5 shrink-0 opacity-70 transition group-hover:opacity-100",
-                    !isActive && "sm:opacity-0 sm:group-hover:opacity-100",
-                  )}
-                  onClick={() => onCloseTab(tab.id)}
-                  size="icon-sm"
-                  type="button"
-                  variant="ghost"
-                >
-                  <X aria-hidden="true" />
-                </Button>
-              ) : null}
+                onRename={(name) => {
+                  onRenameTab(tab.id, name);
+                  setAnnouncement(`${label} renamed to ${name}.`);
+                }}
+                onSelect={() => onSelectTab(tab.id)}
+                tab={tab}
+              />
             </div>
           );
         })}

@@ -33,6 +33,7 @@ import { ACCEPTED_FILE_TYPES } from "@/lib/markdown/constants";
 import {
   createReaderTab,
   isEditablePasteTarget,
+  normalizeMarkdownDocumentName,
 } from "@/lib/markdown/document";
 import { cn } from "@/lib/utils";
 
@@ -176,6 +177,28 @@ export function MarkdownReader() {
       {
         activeTabId: nextTab.id,
         tabs: [...currentState.tabs, nextTab],
+      },
+      { persistImmediately: true },
+    );
+  }
+
+  function renameDocument(tabId: string, name: string) {
+    const nextName = normalizeMarkdownDocumentName(name);
+    const tab = getCurrentReaderState().tabs.find(
+      (candidate) => candidate.id === tabId,
+    );
+
+    if (!nextName || !tab?.file || tab.file.name === nextName) {
+      return;
+    }
+
+    updateTab(
+      tabId,
+      {
+        file: {
+          ...tab.file,
+          name: nextName,
+        },
       },
       { persistImmediately: true },
     );
@@ -334,6 +357,7 @@ export function MarkdownReader() {
             onCloseTab={closeTab}
             onNewTab={createNewTab}
             onReorderTab={reorderTabs}
+            onRenameTab={renameDocument}
             onSelectTab={selectTab}
             persistenceStatus={persistenceStatus}
             tabs={readerState.tabs}

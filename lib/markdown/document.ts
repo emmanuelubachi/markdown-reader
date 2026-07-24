@@ -150,10 +150,15 @@ export function getPastedDocumentName(content: string) {
   return `${baseName.slice(0, 48) || "Pasted markdown"}.md`;
 }
 
-// Turns a document name into a safe filename for downloading, guaranteeing a
-// markdown extension so the saved file opens as markdown.
-export function getDownloadFileName(name: string) {
-  const safeName = name.replace(/[/\\:*?"<>|]/g, "").trim() || "document";
+// Normalize user-authored document names once so the tab label, persisted
+// session, file summary, and downloaded filename always agree.
+export function normalizeMarkdownDocumentName(name: string) {
+  const safeName = name.replace(/[/\\:*?"<>|]/g, "").trim();
+
+  if (!safeName) {
+    return null;
+  }
+
   const lowerName = safeName.toLowerCase();
   const hasMarkdownExtension =
     lowerName.endsWith(".md") ||
@@ -162,6 +167,12 @@ export function getDownloadFileName(name: string) {
     lowerName.endsWith(".mkd");
 
   return hasMarkdownExtension ? safeName : `${safeName}.md`;
+}
+
+// Turns a document name into a safe filename for downloading, guaranteeing a
+// markdown extension so the saved file opens as markdown.
+export function getDownloadFileName(name: string) {
+  return normalizeMarkdownDocumentName(name) ?? "document.md";
 }
 
 export function formatBytes(bytes: number) {
