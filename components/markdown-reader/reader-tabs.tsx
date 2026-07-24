@@ -1,56 +1,25 @@
 "use client";
 
 import {
-  useEffect,
-  useRef,
   useState,
   type DragEvent,
   type KeyboardEvent,
 } from "react";
-import {
-  AlertCircle,
-  FileText,
-  HardDrive,
-  LoaderCircle,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react";
+import { AlertCircle, FileText, Plus, X } from "lucide-react";
 
 import { ModeToggle } from "@/components/mode-toggle";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ReaderStorageMenu } from "@/components/markdown-reader/reader-storage-menu";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useActiveTabScroll } from "@/hooks/use-active-tab-scroll";
+import type { ReaderPersistenceStatus } from "@/hooks/use-reader-session";
 import { getReaderTabLabel } from "@/lib/markdown/document";
 import type { ReaderTab } from "@/lib/markdown/types";
 import { cn } from "@/lib/utils";
-
-type ReaderPersistenceStatus =
-  | "error"
-  | "restoring"
-  | "saved"
-  | "saving"
-  | "unavailable";
 
 type TabPlacement = "after" | "before";
 
@@ -60,27 +29,6 @@ type TabDropTarget = {
 };
 
 const READER_TAB_DRAG_TYPE = "application/x-markdown-reader-tab";
-
-function scrollTabIntoView(tabList: HTMLDivElement, activeTab: HTMLDivElement) {
-  const tabListBounds = tabList.getBoundingClientRect();
-  const activeTabBounds = activeTab.getBoundingClientRect();
-  let nextScrollLeft: number | null = null;
-
-  if (activeTabBounds.left < tabListBounds.left) {
-    nextScrollLeft =
-      tabList.scrollLeft + activeTabBounds.left - tabListBounds.left;
-  } else if (activeTabBounds.right > tabListBounds.right) {
-    nextScrollLeft =
-      tabList.scrollLeft + activeTabBounds.right - tabListBounds.right;
-  }
-
-  if (nextScrollLeft !== null) {
-    tabList.scrollTo({
-      behavior: "smooth",
-      left: nextScrollLeft,
-    });
-  }
-}
 
 export function ReaderTabs({
   activeTabId,
@@ -107,34 +55,10 @@ export function ReaderTabs({
   persistenceStatus: ReaderPersistenceStatus;
   tabs: ReaderTab[];
 }) {
-  const activeTabRef = useRef<HTMLDivElement>(null);
-  const tabListRef = useRef<HTMLDivElement>(null);
+  const { activeTabRef, tabListRef } = useActiveTabScroll(activeTabId, tabs);
   const [announcement, setAnnouncement] = useState("");
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<TabDropTarget | null>(null);
-
-  useEffect(() => {
-    const tabList = tabListRef.current;
-    const activeTab = activeTabRef.current;
-
-    if (!tabList || !activeTab) {
-      return;
-    }
-
-    const scrollActiveTabIntoView = () => scrollTabIntoView(tabList, activeTab);
-
-    scrollActiveTabIntoView();
-
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-
-    const resizeObserver = new ResizeObserver(scrollActiveTabIntoView);
-
-    resizeObserver.observe(tabList);
-
-    return () => resizeObserver.disconnect();
-  }, [activeTabId, tabs]);
 
   function resetDragState() {
     setDraggedTabId(null);
@@ -374,109 +298,5 @@ export function ReaderTabs({
         <ModeToggle />
       </div>
     </div>
-  );
-}
-
-function ReaderStorageMenu({
-  onClearSession,
-  status,
-}: {
-  onClearSession: () => void;
-  status: ReaderPersistenceStatus;
-}) {
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-
-  // Nothing is stored when persistence is unavailable — no control to show.
-  if (status === "unavailable") {
-    return null;
-  }
-
-  const isBusy = status === "restoring" || status === "saving";
-  const isError = status === "error";
-  const statusLabel =
-    status === "restoring"
-      ? "Restoring your session…"
-      : status === "saving"
-        ? "Saving to this browser…"
-        : status === "error"
-          ? "Autosave paused"
-          : "Saved to this browser";
-
-  const StatusIcon = isBusy ? LoaderCircle : isError ? AlertCircle : HardDrive;
-
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              aria-label={statusLabel}
-              className={cn(
-                "mb-0.5 size-9 shrink-0",
-                isError
-                  ? "text-destructive"
-                  : isBusy
-                    ? "text-[#03444A] dark:text-[#58D1E2]"
-                    : "text-muted-foreground",
-              )}
-              size="icon"
-              type="button"
-              variant="ghost"
-            />
-          }
-        >
-          <StatusIcon
-            className={cn("size-4", isBusy && "animate-spin")}
-            aria-hidden="true"
-          />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-60">
-          <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground">
-            <StatusIcon
-              className={cn(
-                "size-3.5 shrink-0",
-                isBusy && "animate-spin",
-                isError && "text-destructive",
-              )}
-              aria-hidden="true"
-            />
-            {statusLabel}
-          </div>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setIsConfirmOpen(true)}
-            variant="destructive"
-          >
-            <Trash2 aria-hidden="true" />
-            Clear saved documents
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <AlertDialog onOpenChange={setIsConfirmOpen} open={isConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Clear saved documents?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This removes every tab saved in this browser and starts a new,
-              empty session. Documents open right now will be closed. This
-              can&rsquo;t be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                onClearSession();
-                setIsConfirmOpen(false);
-              }}
-              variant="destructive"
-            >
-              Clear documents
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
   );
 }
