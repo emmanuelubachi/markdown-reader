@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Check,
-  ChevronDown,
-  ChevronRight,
   Palette,
   PencilLine,
   Ungroup,
@@ -101,17 +99,10 @@ export function ReaderTabGroupLabel({
     return (
       <div
         className={cn(
-          "mb-1 flex h-7 w-32 shrink-0 items-center gap-1.5 rounded-full border px-2",
+          "mb-1 flex h-7 w-32 shrink-0 items-center rounded-md border px-2.5 shadow-xs",
           TAB_GROUP_PILL_CLASSES[group.color],
         )}
       >
-        <span
-          aria-hidden="true"
-          className={cn(
-            "size-2 shrink-0 rounded-full",
-            TAB_GROUP_DOT_CLASSES[group.color],
-          )}
-        />
         <input
           ref={inputRef}
           aria-invalid={isInvalid}
@@ -149,7 +140,7 @@ export function ReaderTabGroupLabel({
             aria-keyshortcuts="F2"
             aria-label={`${group.name} group, ${tabCount} tab${tabCount === 1 ? "" : "s"}`}
             className={cn(
-              "mb-1 flex h-7 max-w-36 shrink-0 items-center gap-1.5 rounded-full border px-2 text-xs font-medium outline-none transition hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring/40 dark:hover:brightness-110",
+              "mb-1 flex h-7 max-w-36 shrink-0 items-center rounded-md border px-2.5 text-xs font-semibold outline-none shadow-xs transition-[background-color,border-color,box-shadow,filter] hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring/40 dark:hover:brightness-110",
               TAB_GROUP_PILL_CLASSES[group.color],
               hasActiveTab && "ring-2 ring-ring/35",
             )}
@@ -169,20 +160,7 @@ export function ReaderTabGroupLabel({
           />
         }
       >
-        {group.collapsed ? (
-          <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />
-        ) : (
-          <ChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
-        )}
-        <span
-          aria-hidden="true"
-          className={cn(
-            "size-2 shrink-0 rounded-full",
-            TAB_GROUP_DOT_CLASSES[group.color],
-          )}
-        />
         <span className="truncate">{group.name}</span>
-        <span className="tabular-nums opacity-65">{tabCount}</span>
       </ContextMenuTrigger>
 
       <ContextMenuContent>

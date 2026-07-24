@@ -10,15 +10,15 @@ export const TAB_GROUP_COLOR_LABELS: Record<ReaderTabGroupColor, string> = {
 };
 
 export const TAB_GROUP_PILL_CLASSES: Record<ReaderTabGroupColor, string> = {
-  blue: "border-blue-500/35 bg-blue-500/15 text-blue-800 dark:text-blue-300",
-  cyan: "border-cyan-500/35 bg-cyan-500/15 text-cyan-800 dark:text-cyan-300",
+  blue: "border-blue-500/40 bg-blue-500/16 text-blue-800 dark:text-blue-200",
+  cyan: "border-cyan-500/40 bg-cyan-500/16 text-cyan-800 dark:text-cyan-200",
   green:
-    "border-emerald-500/35 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
+    "border-emerald-500/40 bg-emerald-500/16 text-emerald-800 dark:text-emerald-200",
   orange:
-    "border-orange-500/35 bg-orange-500/15 text-orange-800 dark:text-orange-300",
-  pink: "border-pink-500/35 bg-pink-500/15 text-pink-800 dark:text-pink-300",
+    "border-orange-500/40 bg-orange-500/16 text-orange-800 dark:text-orange-200",
+  pink: "border-pink-500/40 bg-pink-500/16 text-pink-800 dark:text-pink-200",
   purple:
-    "border-purple-500/35 bg-purple-500/15 text-purple-800 dark:text-purple-300",
+    "border-purple-500/40 bg-purple-500/16 text-purple-800 dark:text-purple-200",
 };
 
 export const TAB_GROUP_DOT_CLASSES: Record<ReaderTabGroupColor, string> = {
@@ -40,4 +40,16 @@ export const TAB_GROUP_TAB_ACCENT_CLASSES: Record<
   orange: "after:bg-orange-500",
   pink: "after:bg-pink-500",
   purple: "after:bg-purple-500",
+};
+
+export const TAB_GROUP_TAB_TINT_CLASSES: Record<
+  ReaderTabGroupColor,
+  string
+> = {
+  blue: "bg-blue-500/5 hover:bg-blue-500/10",
+  cyan: "bg-cyan-500/5 hover:bg-cyan-500/10",
+  green: "bg-emerald-500/5 hover:bg-emerald-500/10",
+  orange: "bg-orange-500/5 hover:bg-orange-500/10",
+  pink: "bg-pink-500/5 hover:bg-pink-500/10",
+  purple: "bg-purple-500/5 hover:bg-purple-500/10",
 };

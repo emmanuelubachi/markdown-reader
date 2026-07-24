@@ -12,7 +12,10 @@ import { ModeToggle } from "@/components/mode-toggle";
 import { ReaderStorageMenu } from "@/components/markdown-reader/reader-storage-menu";
 import { ReaderTabGroupLabel } from "@/components/markdown-reader/reader-tab-group-label";
 import { ReaderTabTrigger } from "@/components/markdown-reader/reader-tab-trigger";
-import { TAB_GROUP_TAB_ACCENT_CLASSES } from "@/components/markdown-reader/tab-group-styles";
+import {
+  TAB_GROUP_TAB_ACCENT_CLASSES,
+  TAB_GROUP_TAB_TINT_CLASSES,
+} from "@/components/markdown-reader/tab-group-styles";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -280,9 +283,14 @@ export function ReaderTabs({
                     "group relative flex min-w-24 max-w-56 -translate-y-0.5 flex-[1_1_14rem] items-center rounded-t-lg border border-b-0 text-xs transition",
                     isActive
                       ? "z-10 border-border/70 text-foreground -mb-px translate-y-0 pb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)] bg-card"
-                      : "border-none bg-card/80 text-muted-foreground hover:bg-background/60 hover:text-foreground",
+                      : cn(
+                          "border-none text-muted-foreground hover:text-foreground",
+                          tabGroup
+                            ? TAB_GROUP_TAB_TINT_CLASSES[tabGroup.color]
+                            : "bg-card/80 hover:bg-background/60",
+                        ),
                     tabGroup &&
-                      "after:pointer-events-none after:absolute after:inset-x-2 after:top-0 after:h-0.5 after:rounded-full",
+                      "-ml-0.5 after:pointer-events-none after:absolute after:inset-x-0 after:top-0 after:h-px after:opacity-80",
                     tabGroup &&
                       TAB_GROUP_TAB_ACCENT_CLASSES[tabGroup.color],
                     draggedTabId === tab.id && "opacity-45",
