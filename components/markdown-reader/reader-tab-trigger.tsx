@@ -154,7 +154,7 @@ export function ReaderTabTrigger({
             ref={inputRef}
             aria-invalid={isInvalid}
             aria-label={`Rename ${label}`}
-            className="h-5 min-w-0 flex-1 rounded-sm border border-input bg-background px-1 text-xs outline-none selection:bg-[#58D1E2]/30 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 aria-invalid:border-destructive aria-invalid:ring-destructive/20"
+            className="h-5 min-w-0 flex-1 border-0 border-b border-foreground/20 bg-transparent px-0.5 text-xs font-medium text-foreground outline-none transition-[border-color,box-shadow] selection:bg-[#58D1E2]/30 focus-visible:border-[#178b98] focus-visible:shadow-[0_1px_0_0_#178b98] dark:focus-visible:border-[#58D1E2] dark:focus-visible:shadow-[0_1px_0_0_#58D1E2] aria-invalid:border-destructive aria-invalid:shadow-[0_1px_0_0_var(--destructive)]"
             maxLength={180}
             onBlur={() => commitRename(true)}
             onChange={(event) => {
