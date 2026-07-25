@@ -35,6 +35,12 @@ type TabDropTarget = {
   tabId: string;
 };
 
+type GroupDropTarget = {
+  groupId: string;
+  placement: TabPlacement;
+};
+
+const READER_GROUP_DRAG_TYPE = "application/x-markdown-reader-tab-group";
 const READER_TAB_DRAG_TYPE = "application/x-markdown-reader-tab";
 
 export function ReaderTabs({
@@ -47,6 +53,7 @@ export function ReaderTabs({
   onMoveTabToGroup,
   onNewTab,
   onReorderTab,
+  onReorderTabGroup,
   onRenameTab,
   onSelectTab,
   onToggleTabGroup,
@@ -68,6 +75,11 @@ export function ReaderTabs({
     targetTabId: string,
     placement: TabPlacement,
   ) => void;
+  onReorderTabGroup: (
+    movedGroupId: string,
+    targetGroupId: string,
+    placement: TabPlacement,
+  ) => void;
   onRenameTab: (tabId: string, name: string) => void;
   onSelectTab: (tabId: string) => void;
   onToggleTabGroup: (groupId: string) => void;
@@ -85,13 +97,27 @@ export function ReaderTabs({
     groups,
   );
   const [announcement, setAnnouncement] = useState("");
+  const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  const [groupDropTarget, setGroupDropTarget] =
+    useState<GroupDropTarget | null>(null);
   const [dropTarget, setDropTarget] = useState<TabDropTarget | null>(null);
   const groupsById = new Map(groups.map((group) => [group.id, group]));
   const renderedGroupIds = new Set<string>();
+  const orderedGroups = [
+    ...new Set(
+      tabs.flatMap((tab) => (tab.groupId ? [tab.groupId] : [])),
+    ),
+  ].flatMap((groupId) => {
+    const group = groupsById.get(groupId);
+
+    return group ? [group] : [];
+  });
 
   function resetDragState() {
+    setDraggedGroupId(null);
     setDraggedTabId(null);
+    setGroupDropTarget(null);
     setDropTarget(null);
   }
 
@@ -101,14 +127,134 @@ export function ReaderTabs({
   ) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData(READER_TAB_DRAG_TYPE, tabId);
+    setDraggedGroupId(null);
     setDraggedTabId(tabId);
+    setGroupDropTarget(null);
     setDropTarget(null);
+  }
+
+  function handleGroupDragStart(
+    event: DragEvent<HTMLButtonElement>,
+    groupId: string,
+  ) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(READER_GROUP_DRAG_TYPE, groupId);
+    setDraggedGroupId(groupId);
+    setDraggedTabId(null);
+    setGroupDropTarget(null);
+    setDropTarget(null);
+  }
+
+  function updateGroupDropTarget(
+    event: DragEvent<HTMLElement>,
+    targetGroupId: string,
+  ) {
+    const movedGroupId =
+      draggedGroupId ||
+      event.dataTransfer.getData(READER_GROUP_DRAG_TYPE);
+
+    if (!movedGroupId || movedGroupId === targetGroupId) {
+      return false;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+
+    const targetBounds = event.currentTarget.getBoundingClientRect();
+    const placement: TabPlacement =
+      event.clientX < targetBounds.left + targetBounds.width / 2
+        ? "before"
+        : "after";
+
+    setGroupDropTarget((currentTarget) =>
+      currentTarget?.groupId === targetGroupId &&
+      currentTarget.placement === placement
+        ? currentTarget
+        : { groupId: targetGroupId, placement },
+    );
+
+    return true;
+  }
+
+  function moveGroup(
+    movedGroupId: string,
+    targetGroupId: string,
+    placement: TabPlacement,
+  ) {
+    onReorderTabGroup(movedGroupId, targetGroupId, placement);
+
+    const movedGroup = groupsById.get(movedGroupId);
+    const targetGroup = groupsById.get(targetGroupId);
+
+    if (movedGroup && targetGroup) {
+      setAnnouncement(
+        `${movedGroup.name} moved ${placement} ${targetGroup.name}.`,
+      );
+    }
+  }
+
+  function handleGroupDrop(
+    event: DragEvent<HTMLElement>,
+    targetGroupId: string,
+  ) {
+    const movedGroupId =
+      draggedGroupId ||
+      event.dataTransfer.getData(READER_GROUP_DRAG_TYPE);
+    const placement =
+      groupDropTarget?.groupId === targetGroupId
+        ? groupDropTarget.placement
+        : "before";
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (movedGroupId && movedGroupId !== targetGroupId) {
+      moveGroup(movedGroupId, targetGroupId, placement);
+    }
+
+    resetDragState();
+  }
+
+  function moveGroupByKeyboard(
+    groupId: string,
+    direction: "left" | "right",
+  ) {
+    const groupIndex = orderedGroups.findIndex(
+      (group) => group.id === groupId,
+    );
+    const targetGroup =
+      orderedGroups[groupIndex + (direction === "left" ? -1 : 1)];
+
+    if (!targetGroup) {
+      return;
+    }
+
+    moveGroup(
+      groupId,
+      targetGroup.id,
+      direction === "left" ? "before" : "after",
+    );
   }
 
   function handleTabDragOver(
     event: DragEvent<HTMLDivElement>,
     targetTabId: string,
   ) {
+    const targetTab = tabs.find((tab) => tab.id === targetTabId);
+    const movedGroupId =
+      draggedGroupId ||
+      event.dataTransfer.getData(READER_GROUP_DRAG_TYPE);
+
+    if (
+      movedGroupId &&
+      targetTab?.groupId &&
+      movedGroupId !== targetTab.groupId
+    ) {
+      updateGroupDropTarget(event, targetTab.groupId);
+      return;
+    }
+
     const movedTabId =
       draggedTabId || event.dataTransfer.getData(READER_TAB_DRAG_TYPE);
 
@@ -138,6 +284,20 @@ export function ReaderTabs({
     event: DragEvent<HTMLDivElement>,
     targetTabId: string,
   ) {
+    const targetTab = tabs.find((tab) => tab.id === targetTabId);
+    const movedGroupId =
+      draggedGroupId ||
+      event.dataTransfer.getData(READER_GROUP_DRAG_TYPE);
+
+    if (
+      movedGroupId &&
+      targetTab?.groupId &&
+      movedGroupId !== targetTab.groupId
+    ) {
+      handleGroupDrop(event, targetTab.groupId);
+      return;
+    }
+
     const movedTabId =
       draggedTabId || event.dataTransfer.getData(READER_TAB_DRAG_TYPE);
     const placement =
@@ -255,9 +415,29 @@ export function ReaderTabs({
                   className="flex shrink-0 items-end"
                 >
                   <ReaderTabGroupLabel
+                    canDrag={orderedGroups.length > 1}
+                    dropPlacement={
+                      groupDropTarget?.groupId === tabGroup.id
+                        ? groupDropTarget.placement
+                        : null
+                    }
                     group={tabGroup}
+                    isDragging={draggedGroupId === tabGroup.id}
                     onColorChange={(color: ReaderTabGroupColor) =>
                       onUpdateTabGroup(tabGroup.id, { color })
+                    }
+                    onDragEnd={resetDragState}
+                    onDragOver={(event) =>
+                      void updateGroupDropTarget(event, tabGroup.id)
+                    }
+                    onDragStart={(event) =>
+                      handleGroupDragStart(event, tabGroup.id)
+                    }
+                    onDrop={(event) =>
+                      handleGroupDrop(event, tabGroup.id)
+                    }
+                    onMoveByKeyboard={(direction) =>
+                      moveGroupByKeyboard(tabGroup.id, direction)
                     }
                     onRename={(name) => onUpdateTabGroup(tabGroup.id, { name })}
                     onToggle={() => onToggleTabGroup(tabGroup.id)}

@@ -5,6 +5,7 @@ import {
   moveTabToGroup,
   normalizeTabGroupName,
   pruneEmptyTabGroups,
+  reorderTabGroups,
   ungroupTabs,
   updateTabGroup,
 } from "@/lib/markdown/tab-groups";
@@ -80,6 +81,65 @@ describe("tab group operations", () => {
     expect(nextState.tabs.map((tab) => tab.id)).toEqual(["a", "b"]);
     expect(nextState.tabs[1]?.groupId).toBeNull();
     expect(nextState.groups).toHaveLength(1);
+  });
+
+  it("reorders a complete group block without separating its tabs", () => {
+    const state: ReaderState = {
+      activeTabId: "b",
+      groups: [
+        createGroup("one"),
+        createGroup("two"),
+        createGroup("three"),
+      ],
+      tabs: [
+        createTab("a", "one"),
+        createTab("b", "one"),
+        createTab("loose"),
+        createTab("c", "two"),
+        createTab("d", "two"),
+        createTab("e", "three"),
+      ],
+    };
+    const nextState = reorderTabGroups(state, "two", "one", "before");
+
+    expect(nextState.tabs.map((tab) => tab.id)).toEqual([
+      "c",
+      "d",
+      "a",
+      "b",
+      "loose",
+      "e",
+    ]);
+    expect(nextState.groups.map((group) => group.id)).toEqual([
+      "two",
+      "one",
+      "three",
+    ]);
+    expect(nextState.activeTabId).toBe("b");
+  });
+
+  it("moves a group after another group and ignores invalid moves", () => {
+    const state: ReaderState = {
+      activeTabId: "a",
+      groups: [createGroup("one"), createGroup("two")],
+      tabs: [
+        createTab("a", "one"),
+        createTab("b", "one"),
+        createTab("loose"),
+        createTab("c", "two"),
+      ],
+    };
+    const nextState = reorderTabGroups(state, "one", "two", "after");
+
+    expect(nextState.tabs.map((tab) => tab.id)).toEqual([
+      "loose",
+      "c",
+      "a",
+      "b",
+    ]);
+    expect(nextState.groups.map((group) => group.id)).toEqual(["two", "one"]);
+    expect(reorderTabGroups(state, "one", "one", "before")).toBe(state);
+    expect(reorderTabGroups(state, "missing", "two", "before")).toBe(state);
   });
 
   it("renames, recolors, collapses, and ungroups a group", () => {

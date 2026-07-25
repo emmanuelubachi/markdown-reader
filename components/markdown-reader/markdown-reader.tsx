@@ -39,6 +39,7 @@ import {
   createTabGroupForTab,
   moveTabToGroup,
   pruneEmptyTabGroups,
+  reorderTabGroups,
   ungroupTabs,
   updateTabGroup,
 } from "@/lib/markdown/tab-groups";
@@ -225,6 +226,24 @@ export function MarkdownReader() {
   function moveTabIntoGroup(tabId: string, groupId: null | string) {
     const currentState = getCurrentReaderState();
     const nextState = moveTabToGroup(currentState, tabId, groupId);
+
+    if (nextState !== currentState) {
+      commitReaderState(nextState, { persistImmediately: true });
+    }
+  }
+
+  function reorderGroups(
+    movedGroupId: string,
+    targetGroupId: string,
+    placement: "after" | "before",
+  ) {
+    const currentState = getCurrentReaderState();
+    const nextState = reorderTabGroups(
+      currentState,
+      movedGroupId,
+      targetGroupId,
+      placement,
+    );
 
     if (nextState !== currentState) {
       commitReaderState(nextState, { persistImmediately: true });
@@ -423,6 +442,7 @@ export function MarkdownReader() {
             onMoveTabToGroup={moveTabIntoGroup}
             onNewTab={createNewTab}
             onReorderTab={reorderTabs}
+            onReorderTabGroup={reorderGroups}
             onRenameTab={renameDocument}
             onSelectTab={selectTab}
             onToggleTabGroup={toggleTabGroup}
