@@ -356,7 +356,14 @@ function getReaderPersistenceSignature(state: ReaderState) {
   const tabSignatures = state.tabs.map((tab) => {
     const file = tab.file;
     const fileSignature = file
-      ? [file.name, file.size, file.lastModified, file.source].join("\u0000")
+      ? [
+          file.name,
+          file.size,
+          file.lastModified,
+          file.source,
+          file.kind,
+          file.kind === "pdf" ? file.pageCount : "",
+        ].join("\u0000")
       : "";
 
     return [

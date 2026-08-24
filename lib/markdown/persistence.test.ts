@@ -18,6 +18,7 @@ const STORE_NAME = "reader-sessions";
 
 const file: LoadedFile = {
   content: "# Saved",
+  kind: "markdown",
   lastModified: 1_700_000_000_000,
   name: "Saved.md",
   size: 7,
@@ -147,7 +148,7 @@ describe("saveReaderSession and loadReaderSession", () => {
   it("ignores records from an unknown schema version", async () => {
     await putRawRecord({
       savedAt: 123,
-      schemaVersion: 2,
+      schemaVersion: 99,
       state: { activeTabId: "a", tabs: [createTab("a")] },
     });
 
@@ -200,6 +201,7 @@ describe("saveReaderSession and loadReaderSession", () => {
 
     expect(tabA?.file).toMatchObject({
       content: "hello",
+      kind: "markdown",
       name: "hello.md",
       size: 5,
       source: "paste",
@@ -208,6 +210,39 @@ describe("saveReaderSession and loadReaderSession", () => {
     expect(tabA?.view).toBe("preview");
     expect(tabB?.file).toBeNull();
     expect(tabB?.view).toBe("preview");
+  });
+
+  it("round-trips an imported PDF and restores its original view", async () => {
+    const pdfData = new Uint8Array([37, 80, 68, 70]).buffer;
+    const pdfFile: LoadedFile = {
+      content: "# Report\n\n## Page 1\n\nHello",
+      kind: "pdf",
+      lastModified: 1_700_000_000_000,
+      name: "Report.pdf",
+      originalData: pdfData,
+      pageCount: 1,
+      size: pdfData.byteLength,
+      source: "file",
+    };
+    const tab = createTab("pdf", pdfFile);
+    tab.view = "original";
+
+    await saveReaderSession({
+      activeTabId: tab.id,
+      groups: [],
+      tabs: [tab],
+    });
+
+    const session = await loadReaderSession();
+    const restoredFile = session?.state.tabs[0]?.file;
+
+    expect(session?.state.tabs[0]?.view).toBe("original");
+    expect(restoredFile?.kind).toBe("pdf");
+    expect(
+      restoredFile?.kind === "pdf"
+        ? Array.from(new Uint8Array(restoredFile.originalData))
+        : [],
+    ).toEqual([37, 80, 68, 70]);
   });
 
   it("never lets an older save overwrite a newer record", async () => {

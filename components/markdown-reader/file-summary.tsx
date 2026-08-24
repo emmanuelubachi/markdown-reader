@@ -32,7 +32,11 @@ export function FileSummary({
           </p>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {formatBytes(file.size)} ·{" "}
-            {file.source === "paste" ? "pasted" : "edited"}{" "}
+            {file.kind === "pdf"
+              ? [file.pageCount, file.pageCount === 1 ? "page" : "pages", "· imported"].join(" ")
+              : file.source === "paste"
+                ? "pasted"
+                : "edited"}{" "}
             {formatDate(file.lastModified)}
           </p>
         </div>
@@ -56,7 +60,14 @@ export function FileSummary({
       </div>
       <dl className="mt-3 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-border/60 bg-border/60 text-center">
         <Stat label="Words" value={stats.words.toLocaleString()} />
-        <Stat label="Lines" value={stats.lines.toLocaleString()} />
+        <Stat
+          label={file.kind === "pdf" ? "Pages" : "Lines"}
+          value={
+            file.kind === "pdf"
+              ? file.pageCount.toLocaleString()
+              : stats.lines.toLocaleString()
+          }
+        />
         <Stat label="Read" value={`${stats.readingMinutes}m`} />
       </dl>
     </div>

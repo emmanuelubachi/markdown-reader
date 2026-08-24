@@ -7,10 +7,12 @@ import {
   ClipboardPaste,
   Columns2,
   Download,
+  FileSearch,
   PanelRightClose,
   Upload,
 } from "lucide-react";
 
+import { DocumentImportOverlay } from "@/components/markdown-reader/document-import-overlay";
 import { PasteMarkdownDialog } from "@/components/markdown-reader/paste-dialog";
 import { ReadAloudToolbar } from "@/components/markdown-reader/read-aloud-toolbar";
 import { ReaderTabs } from "@/components/markdown-reader/reader-tabs";
@@ -33,7 +35,7 @@ import { ACCEPTED_FILE_TYPES } from "@/lib/markdown/constants";
 import {
   createReaderTab,
   isEditablePasteTarget,
-  normalizeMarkdownDocumentName,
+  normalizeDocumentName,
 } from "@/lib/markdown/document";
 import {
   createTabGroupForTab,
@@ -65,12 +67,14 @@ export function MarkdownReader() {
     [readerState.activeTabId, readerState.tabs],
   );
   const {
+    cancelImport,
     downloadDocument,
     handleDragEnter,
     handleDragLeave,
     handleDragOver,
     handleDrop,
     inputRef,
+    importProgress,
     isDragging,
     loadMarkdownText,
     openFilePicker,
@@ -140,7 +144,7 @@ export function MarkdownReader() {
     commitReaderState({
       ...currentState,
       tabs: currentState.tabs.map((tab) => {
-        if (tab.id !== tabId || !tab.file) {
+        if (tab.id !== tabId || tab.file?.kind !== "markdown") {
           return tab;
         }
 
@@ -193,10 +197,12 @@ export function MarkdownReader() {
   }
 
   function renameDocument(tabId: string, name: string) {
-    const nextName = normalizeMarkdownDocumentName(name);
     const tab = getCurrentReaderState().tabs.find(
       (candidate) => candidate.id === tabId,
     );
+    const nextName = tab?.file
+      ? normalizeDocumentName(name, tab.file.kind)
+      : null;
 
     if (!nextName || !tab?.file || tab.file.name === nextName) {
       return;
@@ -401,7 +407,7 @@ export function MarkdownReader() {
           <div className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[#58D1E2] bg-[#58D1E2]/12 px-10 py-8 text-center text-[#03444A] shadow-lg dark:text-[#58D1E2]">
             <Upload className="size-8" aria-hidden="true" />
             <p className="text-base font-semibold">
-              Drop markdown files to open
+              Drop Markdown or PDF documents to open
             </p>
             <p className="text-sm text-muted-foreground">
               Each file opens in its own tab
@@ -413,12 +419,17 @@ export function MarkdownReader() {
       <Tabs
         className="flex min-h-0 flex-1 flex-col gap-0"
         onValueChange={(value) => {
-          if (value === "source") {
+          if (value !== "preview") {
             setTabEditing(activeTab.id, false);
           }
 
           updateTab(activeTab.id, {
-            view: value === "source" && file ? "source" : "preview",
+            view:
+              value === "source" && file?.kind === "markdown"
+                ? "source"
+                : value === "original" && file?.kind === "pdf"
+                  ? "original"
+                  : "preview",
           });
         }}
         value={documentView}
@@ -483,7 +494,7 @@ export function MarkdownReader() {
 
               <div className="flex shrink-0 items-center gap-1.5">
                 <Button
-                  aria-label="Open a Markdown file"
+                  aria-label="Open a Markdown or PDF document"
                   onClick={openFilePicker}
                   size="icon"
                   title="Open file"
@@ -503,10 +514,18 @@ export function MarkdownReader() {
                   <ClipboardPaste aria-hidden="true" />
                 </Button>
                 <Button
-                  aria-label="Download this Markdown file"
+                  aria-label={
+                    file.kind === "pdf"
+                      ? "Export extracted PDF text as Markdown"
+                      : "Download this Markdown file"
+                  }
                   onClick={downloadDocument}
                   size="icon"
-                  title="Download .md"
+                  title={
+                    file.kind === "pdf"
+                      ? "Export extracted text as .md"
+                      : "Download .md"
+                  }
                   type="button"
                   variant="secondary"
                 >
@@ -525,13 +544,20 @@ export function MarkdownReader() {
                     <BookOpen aria-hidden="true" />
                     <span className="hidden xl:inline">Preview</span>
                   </TabsTrigger>
-                  <TabsTrigger aria-label="Source" value="source">
-                    <Braces aria-hidden="true" />
-                    <span className="hidden xl:inline">Source</span>
-                  </TabsTrigger>
+                  {file.kind === "markdown" ? (
+                    <TabsTrigger aria-label="Source" value="source">
+                      <Braces aria-hidden="true" />
+                      <span className="hidden xl:inline">Source</span>
+                    </TabsTrigger>
+                  ) : (
+                    <TabsTrigger aria-label="Original PDF" value="original">
+                      <FileSearch aria-hidden="true" />
+                      <span className="hidden xl:inline">Original</span>
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
-                {!splitTab ? (
+                {!splitTab && file.kind === "markdown" ? (
                   documentView === "preview" ? (
                     <EditPreviewButton
                       isEditing={editingTabIds.has(activeTab.id)}
@@ -564,6 +590,7 @@ export function MarkdownReader() {
           ref={inputRef}
           accept={ACCEPTED_FILE_TYPES}
           className="sr-only"
+          disabled={Boolean(importProgress)}
           multiple
           onChange={(event) => {
             const files = event.currentTarget.files;
@@ -624,6 +651,13 @@ export function MarkdownReader() {
           )}
         </div>
       </Tabs>
+
+      {importProgress ? (
+        <DocumentImportOverlay
+          onCancel={cancelImport}
+          progress={importProgress}
+        />
+      ) : null}
 
       <PasteMarkdownDialog
         onImport={(text) => loadMarkdownText(text, activeTab.id)}

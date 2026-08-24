@@ -20,6 +20,16 @@ export function isMarkdownFile(file: File) {
   );
 }
 
+export function isPdfFile(file: File) {
+  return (
+    file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf"
+  );
+}
+
+export function isSupportedDocumentFile(file: File) {
+  return isMarkdownFile(file) || isPdfFile(file);
+}
+
 export function createDocumentId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -173,10 +183,31 @@ export function normalizeMarkdownDocumentName(name: string) {
   return hasMarkdownExtension ? safeName : `${safeName}.md`;
 }
 
+export function normalizeDocumentName(
+  name: string,
+  kind: LoadedFile["kind"],
+) {
+  if (kind === "markdown") {
+    return normalizeMarkdownDocumentName(name);
+  }
+
+  const safeName = name.replace(/[/\\:*?"<>|]/g, "").trim();
+
+  if (!safeName) {
+    return null;
+  }
+
+  return safeName.toLowerCase().endsWith(".pdf")
+    ? safeName
+    : `${safeName}.pdf`;
+}
+
 // Turns a document name into a safe filename for downloading, guaranteeing a
 // markdown extension so the saved file opens as markdown.
 export function getDownloadFileName(name: string) {
-  return normalizeMarkdownDocumentName(name) ?? "document.md";
+  const withoutPdfExtension = name.replace(/\.pdf$/i, "");
+
+  return normalizeMarkdownDocumentName(withoutPdfExtension) ?? "document.md";
 }
 
 export function formatBytes(bytes: number) {

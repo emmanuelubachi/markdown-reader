@@ -22,7 +22,7 @@ function UploadDropZone({
 }: DropZoneProps) {
   return (
     <div
-      aria-label="Markdown input area"
+      aria-label="Document input area"
       className={cn(
         "relative flex w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed bg-background/70 px-6 py-10 text-center transition focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
         isDragging
@@ -36,10 +36,10 @@ function UploadDropZone({
         <span className="grid size-14 place-items-center rounded-lg border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
           <Upload className="size-7" aria-hidden="true" />
         </span>
-        <h2 className="mt-5 text-xl font-semibold">Open a Markdown file</h2>
+        <h2 className="mt-5 text-xl font-semibold">Open a document</h2>
         <p className="mt-2 max-w-md text-sm text-muted-foreground">
-          Drop a markdown file anywhere in this panel, choose a file, or paste
-          copied markdown text.
+          Drop a Markdown or PDF document anywhere in this panel, choose a
+          file, or paste copied Markdown text.
         </p>
 
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
@@ -58,7 +58,7 @@ function UploadDropZone({
         </p>
 
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-          {[".md", ".markdown", "Max 5 MB", "Local only"].map((label) => (
+          {[".md", ".pdf", "PDFs up to 25 MB", "Local only"].map((label) => (
             <Badge
               className="border-[#8EA8AC]/35 bg-background/70 text-muted-foreground"
               key={label}

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
 import { Textarea } from "@/components/ui/textarea";
-import { MAX_FILE_SIZE } from "@/lib/markdown/constants";
+import { MAX_MARKDOWN_FILE_SIZE } from "@/lib/markdown/constants";
 import { formatBytes } from "@/lib/markdown/document";
 import { getDocumentStats } from "@/lib/markdown/stats";
 
@@ -47,7 +47,7 @@ export function PasteMarkdownDialog({
     () => (trimmedValue ? getDocumentStats(value).words : 0),
     [trimmedValue, value],
   );
-  const isTooLarge = byteSize > MAX_FILE_SIZE;
+  const isTooLarge = byteSize > MAX_MARKDOWN_FILE_SIZE;
   const canImport = Boolean(trimmedValue) && !isTooLarge;
 
   function focusTextarea() {

@@ -8,6 +8,9 @@ import {
   getPastedDocumentName,
   getReaderTabLabel,
   isMarkdownFile,
+  isPdfFile,
+  isSupportedDocumentFile,
+  normalizeDocumentName,
   normalizeMarkdownDocumentName,
   placeLoadedFileInReaderState,
   reorderReaderTabs,
@@ -20,6 +23,7 @@ import type {
 
 const pastedFile: LoadedFile = {
   content: "# Pasted safely",
+  kind: "markdown",
   lastModified: 123,
   name: "Pasted safely.md",
   size: 15,
@@ -168,6 +172,20 @@ describe("isMarkdownFile", () => {
   });
 });
 
+describe("PDF document detection", () => {
+  it("accepts PDF extensions and MIME types", () => {
+    expect(isPdfFile(new File([""], "REPORT.PDF"))).toBe(true);
+    expect(
+      isPdfFile(new File([""], "report", { type: "application/pdf" })),
+    ).toBe(true);
+    expect(isSupportedDocumentFile(new File([""], "report.pdf"))).toBe(true);
+  });
+
+  it("rejects non-PDF files", () => {
+    expect(isPdfFile(new File([""], "report.md"))).toBe(false);
+  });
+});
+
 describe("createReaderTab and createLoadedReaderTab", () => {
   it("creates empty preview tabs with unique ids", () => {
     const first = createReaderTab();
@@ -235,6 +253,7 @@ describe("getDownloadFileName", () => {
   it("appends .md when the extension is missing", () => {
     expect(getDownloadFileName("notes")).toBe("notes.md");
     expect(getDownloadFileName("report.txt")).toBe("report.txt.md");
+    expect(getDownloadFileName("report.pdf")).toBe("report.md");
   });
 
   it("strips unsafe characters and falls back to a default name", () => {
@@ -266,6 +285,14 @@ describe("normalizeMarkdownDocumentName", () => {
     );
     expect(normalizeMarkdownDocumentName("   ")).toBeNull();
     expect(normalizeMarkdownDocumentName("///")).toBeNull();
+  });
+});
+
+describe("normalizeDocumentName", () => {
+  it("preserves the document kind when renaming", () => {
+    expect(normalizeDocumentName("Notes", "markdown")).toBe("Notes.md");
+    expect(normalizeDocumentName("Research", "pdf")).toBe("Research.pdf");
+    expect(normalizeDocumentName("Research.PDF", "pdf")).toBe("Research.PDF");
   });
 });
 

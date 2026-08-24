@@ -42,15 +42,28 @@ export type MarkdownBlock = { sourceLine: number } & (
 
 export type HeadingBlock = Extract<MarkdownBlock, { type: "heading" }>;
 
-export type LoadedFile = {
+type LoadedFileBase = {
   content: string;
   lastModified: number;
   name: string;
   size: number;
+};
+
+export type LoadedMarkdownFile = LoadedFileBase & {
+  kind: "markdown";
   source: "file" | "paste";
 };
 
-export type ReaderView = "preview" | "source";
+export type LoadedPdfFile = LoadedFileBase & {
+  kind: "pdf";
+  originalData: ArrayBuffer;
+  pageCount: number;
+  source: "file";
+};
+
+export type LoadedFile = LoadedMarkdownFile | LoadedPdfFile;
+
+export type ReaderView = "original" | "preview" | "source";
 
 export type ReaderTabGroupColor =
   | "blue"

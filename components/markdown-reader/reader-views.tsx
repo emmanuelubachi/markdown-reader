@@ -6,12 +6,14 @@ import {
   BookOpen,
   Braces,
   ChevronDown,
+  FileSearch,
   FileText,
 } from "lucide-react";
 
 import { EditableMarkdownPreview } from "@/components/markdown-reader/editable-markdown-preview";
 import { FileSummary } from "@/components/markdown-reader/file-summary";
 import { Outline } from "@/components/markdown-reader/outline";
+import { PdfOriginalView } from "@/components/markdown-reader/pdf-original-view";
 import {
   EditPreviewButton,
   SourceView,
@@ -114,7 +116,7 @@ export function SingleReaderView({
                     activeModel.readAloudChunkLines,
                   )}
                   content={file.content}
-                  isEditing={isEditing}
+                  isEditing={file.kind === "markdown" && isEditing}
                   key={`${activeTab.id}:${isEditing ? "editing" : "reading"}`}
                   onActiveHeadingChange={(headingId) =>
                     updateTab(activeTab.id, { activeHeadingId: headingId })
@@ -142,7 +144,7 @@ export function SingleReaderView({
           </ScrollArea>
         </TabsContent>
 
-        {file ? (
+        {file?.kind === "markdown" ? (
           <TabsContent
             value="source"
             className="mt-0 min-h-0 flex-1 overflow-hidden"
@@ -150,6 +152,20 @@ export function SingleReaderView({
             <SourceView
               content={file.content}
               onChange={(content) => onSourceChange(activeTab.id, content)}
+            />
+          </TabsContent>
+        ) : null}
+
+        {file?.kind === "pdf" ? (
+          <TabsContent
+            value="original"
+            className="mt-0 min-h-0 flex-1 overflow-hidden"
+          >
+            <PdfOriginalView
+              data={file.originalData}
+              key={activeTab.id}
+              name={file.name}
+              pageCount={file.pageCount}
             />
           </TabsContent>
         ) : null}
@@ -252,12 +268,17 @@ function SplitReaderPane({
     <Tabs
       className="flex h-full min-h-0 flex-col bg-card text-card-foreground"
       onValueChange={(value) => {
-        if (value === "source") {
+        if (value !== "preview") {
           onEditingChange(false);
         }
 
         updateTab(tab.id, {
-          view: value === "source" && file ? "source" : "preview",
+          view:
+            value === "source" && file?.kind === "markdown"
+              ? "source"
+              : value === "original" && file?.kind === "pdf"
+                ? "original"
+                : "preview",
         });
       }}
       value={tab.view}
@@ -307,13 +328,20 @@ function SplitReaderPane({
                 <BookOpen aria-hidden="true" />
                 <span className="hidden xl:inline">Preview</span>
               </TabsTrigger>
-              <TabsTrigger aria-label="Source" value="source">
-                <Braces aria-hidden="true" />
-                <span className="hidden xl:inline">Source</span>
-              </TabsTrigger>
+              {file.kind === "markdown" ? (
+                <TabsTrigger aria-label="Source" value="source">
+                  <Braces aria-hidden="true" />
+                  <span className="hidden xl:inline">Source</span>
+                </TabsTrigger>
+              ) : (
+                <TabsTrigger aria-label="Original PDF" value="original">
+                  <FileSearch aria-hidden="true" />
+                  <span className="hidden xl:inline">Original</span>
+                </TabsTrigger>
+              )}
             </TabsList>
 
-            {tab.view === "preview" ? (
+            {tab.view === "preview" && file.kind === "markdown" ? (
               <EditPreviewButton
                 compact
                 isEditing={isEditing}
@@ -354,7 +382,7 @@ function SplitReaderPane({
                   model.readAloudChunkLines,
                 )}
                 content={file.content}
-                isEditing={isEditing}
+                isEditing={file.kind === "markdown" && isEditing}
                 key={`${tab.id}:${isEditing ? "editing" : "reading"}`}
                 onActiveHeadingChange={(headingId) =>
                   updateTab(tab.id, { activeHeadingId: headingId })
@@ -373,7 +401,7 @@ function SplitReaderPane({
         </ScrollArea>
       </TabsContent>
 
-      {file ? (
+      {file?.kind === "markdown" ? (
         <TabsContent
           value="source"
           className="mt-0 min-h-0 flex-1 overflow-hidden"
@@ -381,6 +409,20 @@ function SplitReaderPane({
           <SourceView
             content={file.content}
             onChange={(content) => onSourceChange(tab.id, content)}
+          />
+        </TabsContent>
+      ) : null}
+
+      {file?.kind === "pdf" ? (
+        <TabsContent
+          value="original"
+          className="mt-0 min-h-0 flex-1 overflow-hidden"
+        >
+          <PdfOriginalView
+            data={file.originalData}
+            key={tab.id}
+            name={file.name}
+            pageCount={file.pageCount}
           />
         </TabsContent>
       ) : null}

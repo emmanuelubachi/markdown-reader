@@ -18,7 +18,7 @@ let lastSaveTimestamp = 0;
 type ReaderSessionRecord = {
   key: typeof SESSION_KEY;
   savedAt: number;
-  schemaVersion: 1;
+  schemaVersion: 2;
   state: ReaderState;
 };
 
@@ -84,7 +84,7 @@ export async function saveReaderSession(state: ReaderState) {
   const record: ReaderSessionRecord = {
     key: SESSION_KEY,
     savedAt,
-    schemaVersion: 1,
+    schemaVersion: 2,
     state: normalizedState,
   };
 
@@ -243,7 +243,10 @@ function openReaderDatabase() {
 }
 
 function normalizeSessionRecord(value: unknown): PersistedReaderSession | null {
-  if (!isRecord(value) || value.schemaVersion !== 1) {
+  if (
+    !isRecord(value) ||
+    (value.schemaVersion !== 1 && value.schemaVersion !== 2)
+  ) {
     return null;
   }
 
@@ -357,15 +360,41 @@ function normalizeLoadedFile(value: unknown): LoadedFile | null {
   const size =
     typeof value.size === "number" && Number.isFinite(value.size)
       ? value.size
-      : new Blob([value.content]).size;
+      : value.originalData instanceof ArrayBuffer
+        ? value.originalData.byteLength
+        : new Blob([value.content]).size;
   const lastModified =
     typeof value.lastModified === "number" &&
     Number.isFinite(value.lastModified)
       ? value.lastModified
       : Date.now();
 
+  if (value.kind === "pdf") {
+    if (
+      value.source !== "file" ||
+      !(value.originalData instanceof ArrayBuffer) ||
+      typeof value.pageCount !== "number" ||
+      !Number.isInteger(value.pageCount) ||
+      value.pageCount < 1
+    ) {
+      return null;
+    }
+
+    return {
+      content: value.content,
+      kind: "pdf",
+      lastModified,
+      name: value.name,
+      originalData: value.originalData,
+      pageCount: value.pageCount,
+      size,
+      source: "file",
+    };
+  }
+
   return {
     content: value.content,
+    kind: "markdown",
     lastModified,
     name: value.name,
     size,
@@ -376,6 +405,10 @@ function normalizeLoadedFile(value: unknown): LoadedFile | null {
 function normalizeReaderView(value: unknown, file: LoadedFile | null): ReaderView {
   if (!file) {
     return "preview";
+  }
+
+  if (file.kind === "pdf") {
+    return value === "original" ? "original" : "preview";
   }
 
   return value === "source" ? "source" : "preview";

@@ -8,8 +8,8 @@
 <h1>Markdown Reader</h1>
 
 <p>
-  A fast, <strong>local-first</strong> markdown reader with a browser-style, full-width interface.<br />
-  Open, drop, or paste markdown and read it in a clean, distraction-free preview — files never leave your browser, nothing is uploaded.
+  A fast, <strong>local-first</strong> Markdown and PDF reader with a browser-style, full-width interface.<br />
+  Open, drop, or paste documents and read them in a clean, distraction-free preview — files never leave your browser, nothing is uploaded.
 </p>
 
 <p>
@@ -27,9 +27,10 @@
 
 ## Features
 
-- 🗂️ **Tabbed documents** — open multiple markdown files at once, browser-style.
-- 📥 **Multiple inputs** — choose a file, drag & drop anywhere, or paste markdown (dialog or ⌘/Ctrl + V).
-- 👀 **Preview & Source** — toggle between the rendered view and the raw markdown.
+- 🗂️ **Tabbed documents** — open multiple Markdown and PDF files at once, browser-style.
+- 📥 **Multiple inputs** — choose or drop Markdown and PDF files, or paste Markdown (dialog or ⌘/Ctrl + V).
+- 📄 **PDF reading** — extract text into a reflowable reader and switch to the locally rendered original pages when layout matters.
+- 👀 **Document views** — toggle between rendered Markdown and source, or between a reflowed PDF reader and original PDF pages.
 - ✍️ **Editable preview** — switch the rendered preview into a Markdown-native rich editor with formatting controls.
 - 🧭 **Outline navigation** — auto-generated heading outline with active-heading tracking as you scroll.
 - 🔊 **Read aloud** — text-to-speech playback with play/pause, stop, and adjustable speed.
@@ -37,7 +38,11 @@
 - 🌗 **Light & dark themes** — system-aware with a manual toggle.
 - 🔒 **Fully local documents** — parsing, rendering, persistence, and read-aloud generation happen in the browser; document content is never uploaded.
 
-Markdown is rendered with [react-markdown](https://github.com/remarkjs/react-markdown) using [remark-gfm](https://github.com/remarkjs/remark-gfm) for GitHub-flavored markdown (tables, task lists, strikethrough) and [rehype-sanitize](https://github.com/rehypejs/rehype-sanitize) plus custom URL/image sanitization. HTTP(S) images referenced by a document are fetched directly by the browser, while unsafe URL schemes remain blocked. The Markdown file and its content are not uploaded or sent to the app server.
+Markdown is rendered with [react-markdown](https://github.com/remarkjs/react-markdown) using [remark-gfm](https://github.com/remarkjs/remark-gfm) for GitHub-flavored markdown (tables, task lists, strikethrough) and [rehype-sanitize](https://github.com/rehypejs/rehype-sanitize) plus custom URL/image sanitization. HTTP(S) images referenced by a document are fetched directly by the browser, while unsafe URL schemes remain blocked.
+
+PDFs are parsed and rendered in the browser with [PDF.js](https://mozilla.github.io/pdf.js/). Text-based PDFs are converted into a reflowable, read-aloud-friendly view while the original pages remain available in a separate view. Scanned PDFs without an embedded text layer require OCR and are reported as unsupported. Password-protected PDFs are not currently supported.
+
+Document files and extracted content are not uploaded or sent to the app server. The current session, including original PDF data, is persisted locally in IndexedDB.
 
 The optional natural read-aloud voice runs on-device after downloading its model on first use. That download does not include document content.
 
@@ -51,6 +56,7 @@ The optional natural read-aloud voice runs on-device after downloading its model
 | Styling    | [Tailwind CSS 4](https://tailwindcss.com)                                      |
 | Components | [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com)           |
 | Markdown   | [react-markdown](https://github.com/remarkjs/react-markdown) · remark · rehype |
+| PDF        | [PDF.js](https://mozilla.github.io/pdf.js/)                                    |
 | Icons      | [lucide-react](https://lucide.dev)                                             |
 | Theming    | [next-themes](https://github.com/pacocoursey/next-themes)                      |
 | Package    | [pnpm](https://pnpm.io)                                                        |
@@ -86,6 +92,7 @@ components/
     read-aloud-toolbar.tsx    # Text-to-speech controls
     paste-dialog.tsx          # Paste-markdown dialog
     markdown-preview.tsx      # Rendered markdown output
+    pdf-original-view.tsx     # Original PDF page rendering
     outline.tsx               # Heading outline
     file-summary.tsx          # File info + stats
     upload-drop-zone.tsx      # Empty-state / drop target
@@ -97,6 +104,7 @@ lib/
     parse.ts                  # Markdown → block model (remark)
     ast.ts                    # AST helpers + heading slugger
     speech, stats, sanitize, document, types
+  pdf/                        # PDF.js loading, text extraction, and conversion
 public/assets/                # Brand logo variants (light/dark)
 ```
 

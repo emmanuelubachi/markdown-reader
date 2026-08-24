@@ -10,6 +10,7 @@ import {
 import {
   AlertCircle,
   FileInput,
+  FileSearch,
   FileText,
   FolderPlus,
   PencilLine,
@@ -28,7 +29,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { normalizeMarkdownDocumentName } from "@/lib/markdown/document";
+import { normalizeDocumentName } from "@/lib/markdown/document";
 import type { ReaderTab, ReaderTabGroup } from "@/lib/markdown/types";
 import { cn } from "@/lib/utils";
 
@@ -79,7 +80,7 @@ export function ReaderTabTrigger({
     input.focus();
 
     const extensionStart = input.value.search(
-      /\.(?:md|markdown|mdown|mkd)$/i,
+      /\.(?:md|markdown|mdown|mkd|pdf)$/i,
     );
 
     input.setSelectionRange(
@@ -106,7 +107,9 @@ export function ReaderTabTrigger({
   }
 
   function commitRename(cancelIfInvalid = false) {
-    const nextName = normalizeMarkdownDocumentName(draftName);
+    const nextName = tab.file
+      ? normalizeDocumentName(draftName, tab.file.kind)
+      : null;
 
     if (!nextName) {
       if (cancelIfInvalid) {
@@ -131,6 +134,16 @@ export function ReaderTabTrigger({
   const icon = tab.error ? (
     <AlertCircle
       className="size-3.5 shrink-0 text-destructive"
+      aria-hidden="true"
+    />
+  ) : tab.file?.kind === "pdf" ? (
+    <FileSearch
+      className={cn(
+        "size-3.5 shrink-0",
+        isActive
+          ? "text-[#03444A] dark:text-[#58D1E2]"
+          : "text-muted-foreground",
+      )}
       aria-hidden="true"
     />
   ) : (

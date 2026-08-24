@@ -4,14 +4,16 @@ import { useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
 
 import {
-  MAX_FILE_SIZE,
+  MAX_MARKDOWN_FILE_SIZE,
   MAX_OPEN_FILES,
+  MAX_PDF_FILE_SIZE,
 } from "@/lib/markdown/constants";
 import {
   createLoadedReaderTab,
   getDownloadFileName,
   getPastedDocumentName,
-  isMarkdownFile,
+  isPdfFile,
+  isSupportedDocumentFile,
   placeLoadedFileInReaderState,
 } from "@/lib/markdown/document";
 import type {
@@ -19,10 +21,30 @@ import type {
   ReaderState,
   ReaderTab,
 } from "@/lib/markdown/types";
+import { importPdfFile, PdfImportError } from "@/lib/pdf/import-pdf";
 
 type CommitOptions = {
   persistImmediately?: boolean;
 };
+
+export type DocumentImportProgress = {
+  fileCount: number;
+  fileIndex: number;
+  fileName: string;
+  page: number;
+  totalPages: number | null;
+};
+
+type FileOpenResult =
+  | { loaded: LoadedFile; status: "ok" }
+  | {
+      status:
+        | "cancelled"
+        | "no-text"
+        | "password-protected"
+        | "too-large"
+        | "unreadable";
+    };
 
 export function useMarkdownFiles({
   activeTab,
@@ -44,6 +66,9 @@ export function useMarkdownFiles({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
+  const importControllerRef = useRef<AbortController | null>(null);
+  const [importProgress, setImportProgress] =
+    useState<DocumentImportProgress | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   function clearFileInput() {
@@ -57,65 +82,143 @@ export function useMarkdownFiles({
       return;
     }
 
-    const markdownFiles = fileList.filter(isMarkdownFile);
-    const nonMarkdown = fileList.length - markdownFiles.length;
-    const overCap = Math.max(0, markdownFiles.length - MAX_OPEN_FILES);
-    const candidates = markdownFiles.slice(0, MAX_OPEN_FILES);
+    if (importControllerRef.current) {
+      toast.info("A document import is already in progress.");
+      return;
+    }
+
+    const supportedFiles = fileList.filter(isSupportedDocumentFile);
+    const unsupported = fileList.length - supportedFiles.length;
+    const overCap = Math.max(0, supportedFiles.length - MAX_OPEN_FILES);
+    const candidates = supportedFiles.slice(0, MAX_OPEN_FILES);
     const isSingleSelection = fileList.length === 1;
 
     if (candidates.length === 0) {
       if (isSingleSelection) {
         updateTab(activeTab.id, {
-          error: "Choose a markdown file with a .md or .markdown extension.",
+          error: "Choose a Markdown or PDF document.",
         });
       } else {
-        notifySkipped({ nonMarkdown, overCap, tooLarge: 0, unreadable: 0 });
+        notifySkipped({
+          noText: 0,
+          overCap,
+          passwordProtected: 0,
+          tooLarge: 0,
+          unreadable: 0,
+          unsupported,
+        });
       }
 
       clearFileInput();
       return;
     }
 
-    const results = await Promise.all(
-      candidates.map(async (file) => {
-        if (file.size > MAX_FILE_SIZE) {
-          return { status: "too-large" as const };
+    const controller = new AbortController();
+    const results: FileOpenResult[] = [];
+
+    importControllerRef.current = controller;
+
+    try {
+      for (const [index, file] of candidates.entries()) {
+        const pdf = isPdfFile(file);
+
+        if (
+          file.size > (pdf ? MAX_PDF_FILE_SIZE : MAX_MARKDOWN_FILE_SIZE)
+        ) {
+          results.push({ status: "too-large" });
+          continue;
         }
 
+        setImportProgress({
+          fileCount: candidates.length,
+          fileIndex: index + 1,
+          fileName: file.name,
+          page: 0,
+          totalPages: null,
+        });
+
         try {
+          if (pdf) {
+            const loaded = await importPdfFile(file, {
+              onProgress: ({ page, totalPages }) => {
+                setImportProgress({
+                  fileCount: candidates.length,
+                  fileIndex: index + 1,
+                  fileName: file.name,
+                  page,
+                  totalPages,
+                });
+              },
+              signal: controller.signal,
+            });
+
+            results.push({ loaded, status: "ok" });
+            continue;
+          }
+
           const content = await file.text();
 
-          return {
+          results.push({
             loaded: {
               content,
+              kind: "markdown",
               lastModified: file.lastModified,
               name: file.name,
               size: file.size,
               source: "file",
             } satisfies LoadedFile,
-            status: "ok" as const,
-          };
-        } catch {
-          return { status: "unreadable" as const };
+            status: "ok",
+          });
+        } catch (error) {
+          if (error instanceof PdfImportError) {
+            results.push({
+              status: error.code === "invalid" ? "unreadable" : error.code,
+            });
+
+            if (error.code === "cancelled") {
+              break;
+            }
+          } else {
+            results.push({ status: "unreadable" });
+          }
         }
-      }),
-    );
+      }
+    } finally {
+      if (importControllerRef.current === controller) {
+        importControllerRef.current = null;
+        setImportProgress(null);
+      }
+    }
 
     const loaded = results.flatMap((result) =>
       result.status === "ok" ? [result.loaded] : [],
     );
     const tooLarge = results.filter((r) => r.status === "too-large").length;
     const unreadable = results.filter((r) => r.status === "unreadable").length;
+    const noText = results.filter((r) => r.status === "no-text").length;
+    const passwordProtected = results.filter(
+      (r) => r.status === "password-protected",
+    ).length;
+    const cancelled = results.some((r) => r.status === "cancelled");
 
     if (loaded.length === 0) {
       if (isSingleSelection) {
         updateTab(activeTab.id, {
-          error: tooLarge
-            ? "This file is larger than 5 MB. Try a smaller markdown file."
-            : "The file could not be read. Try exporting it again.",
+          error: getSingleFileError(results[0]?.status, candidates[0]),
         });
       } else {
-        notifySkipped({ nonMarkdown, overCap, tooLarge, unreadable });
+        notifySkipped({
+          noText,
+          overCap,
+          passwordProtected,
+          tooLarge,
+          unreadable,
+          unsupported,
+        });
+      }
+
+      if (cancelled) {
+        toast.info("Document import cancelled.");
       }
 
       clearFileInput();
@@ -163,7 +266,18 @@ export function useMarkdownFiles({
     );
 
     clearFileInput();
-    notifySkipped({ nonMarkdown, overCap, tooLarge, unreadable });
+    notifySkipped({
+      noText,
+      overCap,
+      passwordProtected,
+      tooLarge,
+      unreadable,
+      unsupported,
+    });
+
+    if (cancelled) {
+      toast.info("Document import cancelled. Files already read were opened.");
+    }
   }
 
   function loadMarkdownText(content: string, tabId = activeTab.id) {
@@ -176,7 +290,7 @@ export function useMarkdownFiles({
 
     const size = new Blob([content]).size;
 
-    if (size > MAX_FILE_SIZE) {
+    if (size > MAX_MARKDOWN_FILE_SIZE) {
       updateTab(tabId, {
         error:
           "The pasted markdown is larger than 5 MB. Try a smaller selection.",
@@ -186,6 +300,7 @@ export function useMarkdownFiles({
 
     const nextFile: LoadedFile = {
       content,
+      kind: "markdown",
       lastModified: Date.now(),
       name: getPastedDocumentName(content),
       size,
@@ -204,6 +319,10 @@ export function useMarkdownFiles({
 
   function openFilePicker() {
     inputRef.current?.click();
+  }
+
+  function cancelImport() {
+    importControllerRef.current?.abort();
   }
 
   function downloadDocument() {
@@ -271,12 +390,14 @@ export function useMarkdownFiles({
   }
 
   return {
+    cancelImport,
     downloadDocument,
     handleDragEnter,
     handleDragLeave,
     handleDragOver,
     handleDrop,
     inputRef,
+    importProgress,
     isDragging,
     loadMarkdownText,
     openFilePicker,
@@ -289,22 +410,32 @@ function dragHasFiles(event: DragEvent<HTMLElement>) {
 }
 
 function notifySkipped(counts: {
-  nonMarkdown: number;
+  noText: number;
   overCap: number;
+  passwordProtected: number;
   tooLarge: number;
   unreadable: number;
+  unsupported: number;
 }) {
   const skipped =
-    counts.nonMarkdown + counts.tooLarge + counts.unreadable + counts.overCap;
+    counts.unsupported +
+    counts.tooLarge +
+    counts.unreadable +
+    counts.noText +
+    counts.passwordProtected +
+    counts.overCap;
 
   if (skipped === 0) {
     return;
   }
 
   const description = [
-    counts.nonMarkdown > 0 && `${counts.nonMarkdown} not markdown`,
-    counts.tooLarge > 0 && `${counts.tooLarge} over 5 MB`,
+    counts.unsupported > 0 && `${counts.unsupported} unsupported`,
+    counts.tooLarge > 0 && `${counts.tooLarge} over the size limit`,
     counts.unreadable > 0 && `${counts.unreadable} unreadable`,
+    counts.noText > 0 && `${counts.noText} without extractable text`,
+    counts.passwordProtected > 0 &&
+      `${counts.passwordProtected} password-protected`,
     counts.overCap > 0 &&
       `${counts.overCap} over the ${MAX_OPEN_FILES}-file limit`,
   ]
@@ -314,4 +445,29 @@ function notifySkipped(counts: {
   toast.warning(`Skipped ${skipped} file${skipped === 1 ? "" : "s"}`, {
     description,
   });
+}
+
+function getSingleFileError(
+  status: FileOpenResult["status"] | undefined,
+  file: File | undefined,
+) {
+  if (status === "too-large") {
+    return file && isPdfFile(file)
+      ? "This PDF is larger than 25 MB. Try a smaller document."
+      : "This file is larger than 5 MB. Try a smaller Markdown file.";
+  }
+
+  if (status === "no-text") {
+    return "This PDF has no extractable text. Scanned PDFs require OCR, which is not supported yet.";
+  }
+
+  if (status === "password-protected") {
+    return "This PDF is password-protected. Remove the password before opening it.";
+  }
+
+  if (status === "cancelled") {
+    return "Document import was cancelled.";
+  }
+
+  return "The document could not be read. Try exporting it again.";
 }
