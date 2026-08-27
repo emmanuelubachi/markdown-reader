@@ -2,6 +2,7 @@
 
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +14,8 @@ import {
 const THEMES = ["light", "dark", "system"] as const;
 
 type Theme = (typeof THEMES)[number];
+
+const subscribeToHydration = () => () => {};
 
 const THEME_DETAILS: Record<
   Theme,
@@ -28,9 +31,15 @@ const THEME_DETAILS: Record<
 
 export function ModeToggle() {
   const { setTheme, theme } = useTheme();
-  const currentTheme: Theme = THEMES.includes(theme as Theme)
-    ? (theme as Theme)
-    : "system";
+  const isHydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
+  const currentTheme: Theme =
+    isHydrated && THEMES.includes(theme as Theme)
+      ? (theme as Theme)
+      : "system";
   const currentIndex = THEMES.indexOf(currentTheme);
   const nextTheme = THEMES[(currentIndex + 1) % THEMES.length]!;
   const currentDetails = THEME_DETAILS[currentTheme];
@@ -52,7 +61,7 @@ export function ModeToggle() {
       >
         <ThemeIcon
           aria-hidden="true"
-          className="h-[1.2rem] w-[1.2rem] transition-transform duration-200"
+          className="transition-transform duration-200"
         />
       </TooltipTrigger>
       <TooltipContent>
