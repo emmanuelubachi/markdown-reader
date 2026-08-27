@@ -1,6 +1,6 @@
 "use client";
 
-import type { ClipboardEvent } from "react";
+import { useState, type ClipboardEvent } from "react";
 import {
   AlertCircle,
   BookOpen,
@@ -8,6 +8,7 @@ import {
   ChevronDown,
   FileSearch,
   FileText,
+  PanelLeftOpen,
 } from "lucide-react";
 
 import { EditableMarkdownPreview } from "@/components/markdown-reader/editable-markdown-preview";
@@ -20,6 +21,7 @@ import {
 } from "@/components/markdown-reader/reader-view-controls";
 import { EmptyPreview } from "@/components/markdown-reader/upload-drop-zone";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -27,6 +29,11 @@ import {
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { ReadAloudController } from "@/hooks/use-read-aloud";
 import {
   getSpeakingLine,
@@ -67,32 +74,57 @@ export function SingleReaderView({
   updateTab: UpdateReaderTab;
 }) {
   const file = activeTab.file;
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
     <div className={cn("min-h-0 flex-1 overflow-hidden", className)}>
       {file ? (
-        <aside className="hidden w-72 shrink-0 flex-col overflow-hidden border-r border-border/70 bg-card/40 lg:flex xl:w-80">
-          <div className="space-y-3 border-b border-border/70 p-3">
-            {activeTab.error ? (
-              <Alert variant="destructive">
-                <AlertCircle aria-hidden="true" />
-                <AlertTitle>File not loaded</AlertTitle>
-                <AlertDescription>{activeTab.error}</AlertDescription>
-              </Alert>
-            ) : null}
+        isSidebarOpen ? (
+          <aside className="hidden w-72 shrink-0 flex-col overflow-hidden border-r border-border/70 bg-card/40 lg:flex xl:w-80">
+            <div className="flex flex-col gap-3 border-b border-border/70 p-3">
+              {activeTab.error ? (
+                <Alert variant="destructive">
+                  <AlertCircle aria-hidden="true" />
+                  <AlertTitle>File not loaded</AlertTitle>
+                  <AlertDescription>{activeTab.error}</AlertDescription>
+                </Alert>
+              ) : null}
 
-            <FileSummary
-              file={file}
-              onReset={onReset}
-              stats={activeModel.stats}
+              <FileSummary
+                file={file}
+                onCollapse={() => setIsSidebarOpen(false)}
+                onReset={onReset}
+                stats={activeModel.stats}
+              />
+            </div>
+
+            <Outline
+              activeHeadingId={activeModel.outlineActiveHeadingId}
+              headings={activeModel.headings}
             />
-          </div>
-
-          <Outline
-            activeHeadingId={activeModel.outlineActiveHeadingId}
-            headings={activeModel.headings}
-          />
-        </aside>
+          </aside>
+        ) : (
+          <aside className="hidden w-11 shrink-0 justify-center border-r border-border/70 bg-card/40 py-3 lg:flex">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    aria-label="Expand sidebar"
+                    aria-expanded="false"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => setIsSidebarOpen(true)}
+                    size="icon-sm"
+                    type="button"
+                    variant="ghost"
+                  />
+                }
+              >
+                <PanelLeftOpen aria-hidden="true" />
+              </TooltipTrigger>
+              <TooltipContent side="right">Expand sidebar</TooltipContent>
+            </Tooltip>
+          </aside>
+        )
       ) : null}
 
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card text-card-foreground">

@@ -1,8 +1,9 @@
 "use client";
 
-import { FileText, X } from "lucide-react";
+import { FileText, FileX, PanelLeftClose } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -13,27 +14,33 @@ import type { DocumentStats, LoadedFile } from "@/lib/markdown/types";
 
 export function FileSummary({
   file,
+  onCollapse,
   onReset,
   stats,
 }: {
   file: LoadedFile;
+  onCollapse: () => void;
   onReset: () => void;
   stats: DocumentStats;
 }) {
   return (
-    <div className="rounded-lg border border-border/60 bg-background/60 p-3 shadow-xs">
-      <div className="flex items-start gap-2.5">
-        <div className="grid size-9 shrink-0 place-items-center rounded-md border border-[#8EA8AC]/35 bg-[#8EA8AC]/15 text-[#03444A] dark:text-[#58D1E2]">
-          <FileText className="size-4" aria-hidden="true" />
+    <div className="flex flex-col gap-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="grid size-11 shrink-0 place-items-center rounded-md border bg-muted text-muted-foreground">
+          <FileText className="size-5" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold" title={file.name}>
             {file.name}
           </p>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          <p className="truncate text-sm text-muted-foreground">
             {formatBytes(file.size)} ·{" "}
             {file.kind === "pdf"
-              ? [file.pageCount, file.pageCount === 1 ? "page" : "pages", "· imported"].join(" ")
+              ? [
+                  file.pageCount,
+                  file.pageCount === 1 ? "page" : "pages",
+                  "· imported",
+                ].join(" ")
               : file.source === "paste"
                 ? "pasted"
                 : "edited"}{" "}
@@ -44,22 +51,26 @@ export function FileSummary({
           <TooltipTrigger
             render={
               <Button
-                aria-label="Remove document"
-                className="-mr-1 -mt-1 size-7 shrink-0 text-muted-foreground hover:text-foreground"
-                onClick={onReset}
+                aria-label="Collapse sidebar"
+                aria-expanded="true"
+                onClick={onCollapse}
                 size="icon-sm"
                 type="button"
                 variant="ghost"
               />
             }
           >
-            <X aria-hidden="true" />
+            <PanelLeftClose aria-hidden="true" />
           </TooltipTrigger>
-          <TooltipContent>Remove document</TooltipContent>
+          <TooltipContent>Collapse sidebar</TooltipContent>
         </Tooltip>
       </div>
-      <dl className="mt-3 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-border/60 bg-border/60 text-center">
+
+      <Separator />
+
+      <dl className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-stretch text-center">
         <Stat label="Words" value={stats.words.toLocaleString()} />
+        <Separator orientation="vertical" />
         <Stat
           label={file.kind === "pdf" ? "Pages" : "Lines"}
           value={
@@ -68,19 +79,29 @@ export function FileSummary({
               : stats.lines.toLocaleString()
           }
         />
+        <Separator orientation="vertical" />
         <Stat label="Read" value={`${stats.readingMinutes}m`} />
       </dl>
+
+      <Separator />
+
+      <div className="flex justify-end">
+        <Button onClick={onReset} size="xs" type="button" variant="ghost">
+          <FileX aria-hidden="true" data-icon="inline-start" />
+          Remove document
+        </Button>
+      </div>
     </div>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-background px-2 py-2.5">
+    <div className="px-2 py-1.5">
       <dt className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-0.5 text-sm font-semibold tabular-nums">{value}</dd>
+      <dd className="mt-1 text-base font-semibold tabular-nums">{value}</dd>
     </div>
   );
 }
