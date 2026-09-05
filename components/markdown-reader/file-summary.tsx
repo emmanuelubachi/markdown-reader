@@ -86,7 +86,13 @@ export function FileSummary({
       <Separator />
 
       <div className="flex justify-end">
-        <Button onClick={onReset} size="xs" type="button" variant="destructive">
+        <Button
+          className="text-foreground"
+          onClick={onReset}
+          size="xs"
+          type="button"
+          variant="destructive"
+        >
           <FileX aria-hidden="true" data-icon="inline-start" />
           Remove document
         </Button>
