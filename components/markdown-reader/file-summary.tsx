@@ -93,7 +93,11 @@ export function FileSummary({
           type="button"
           variant="destructive"
         >
-          <FileX aria-hidden="true" data-icon="inline-start" />
+          <FileX
+            aria-hidden="true"
+            className="text-destructive"
+            data-icon="inline-start"
+          />
           Remove document
         </Button>
       </div>
