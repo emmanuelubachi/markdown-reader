@@ -1,3 +1,4 @@
+import { hasMermaidExtension } from "@/lib/markdown/mermaid";
 import { toPlainSpeechText } from "@/lib/markdown/speech";
 import type {
   LoadedFile,
@@ -20,6 +21,10 @@ export function isMarkdownFile(file: File) {
   );
 }
 
+export function isMermaidFile(file: File) {
+  return hasMermaidExtension(file.name);
+}
+
 export function isPdfFile(file: File) {
   return (
     file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf"
@@ -27,7 +32,7 @@ export function isPdfFile(file: File) {
 }
 
 export function isSupportedDocumentFile(file: File) {
-  return isMarkdownFile(file) || isPdfFile(file);
+  return isMarkdownFile(file) || isMermaidFile(file) || isPdfFile(file);
 }
 
 export function createDocumentId() {
@@ -178,7 +183,8 @@ export function normalizeMarkdownDocumentName(name: string) {
     lowerName.endsWith(".md") ||
     lowerName.endsWith(".markdown") ||
     lowerName.endsWith(".mdown") ||
-    lowerName.endsWith(".mkd");
+    lowerName.endsWith(".mkd") ||
+    hasMermaidExtension(safeName);
 
   return hasMarkdownExtension ? safeName : `${safeName}.md`;
 }
@@ -203,11 +209,12 @@ export function normalizeDocumentName(
 }
 
 // Turns a document name into a safe filename for downloading, guaranteeing a
-// markdown extension so the saved file opens as markdown.
+// markdown extension so the saved file opens as markdown. PDF and Mermaid
+// documents hold converted Markdown, so their source extension is dropped.
 export function getDownloadFileName(name: string) {
-  const withoutPdfExtension = name.replace(/\.pdf$/i, "");
+  const withoutSourceExtension = name.replace(/\.(pdf|mmd|mermaid)$/i, "");
 
-  return normalizeMarkdownDocumentName(withoutPdfExtension) ?? "document.md";
+  return normalizeMarkdownDocumentName(withoutSourceExtension) ?? "document.md";
 }
 
 export function formatBytes(bytes: number) {

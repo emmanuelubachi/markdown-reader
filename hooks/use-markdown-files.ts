@@ -12,10 +12,12 @@ import {
   createLoadedReaderTab,
   getDownloadFileName,
   getPastedDocumentName,
+  isMermaidFile,
   isPdfFile,
   isSupportedDocumentFile,
   placeLoadedFileInReaderState,
 } from "@/lib/markdown/document";
+import { toMermaidMarkdown } from "@/lib/markdown/mermaid";
 import type {
   LoadedFile,
   ReaderState,
@@ -96,7 +98,7 @@ export function useMarkdownFiles({
     if (candidates.length === 0) {
       if (isSingleSelection) {
         updateTab(activeTab.id, {
-          error: "Choose a Markdown or PDF document.",
+          error: "Choose a Markdown, Mermaid, or PDF document.",
         });
       } else {
         notifySkipped({
@@ -156,7 +158,8 @@ export function useMarkdownFiles({
             continue;
           }
 
-          const content = await file.text();
+          const text = await file.text();
+          const content = isMermaidFile(file) ? toMermaidMarkdown(text) : text;
 
           results.push({
             loaded: {

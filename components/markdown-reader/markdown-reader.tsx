@@ -407,7 +407,7 @@ export function MarkdownReader() {
           <div className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[#58D1E2] bg-[#58D1E2]/12 px-10 py-8 text-center text-[#03444A] shadow-lg dark:text-[#58D1E2]">
             <Upload className="size-8" aria-hidden="true" />
             <p className="text-base font-semibold">
-              Drop Markdown or PDF documents to open
+              Drop Markdown, Mermaid, or PDF documents to open
             </p>
             <p className="text-sm text-muted-foreground">
               Each file opens in its own tab
@@ -494,7 +494,7 @@ export function MarkdownReader() {
 
               <div className="flex shrink-0 items-center gap-1.5">
                 <Button
-                  aria-label="Open a Markdown or PDF document"
+                  aria-label="Open a Markdown, Mermaid, or PDF document"
                   onClick={openFilePicker}
                   size="icon"
                   title="Open file"

@@ -29,6 +29,7 @@
 
 - 🗂️ **Tabbed documents** — open multiple Markdown and PDF files at once, browser-style.
 - 📥 **Multiple inputs** — choose or drop Markdown and PDF files, or paste Markdown (dialog or ⌘/Ctrl + V).
+- 🧜 **Mermaid diagrams** — ` ```mermaid ` code blocks render as themed diagrams with a code toggle; `.mmd` / `.mermaid` files open as diagram documents.
 - 📄 **PDF reading** — extract text into a reflowable reader and switch to the locally rendered original pages when layout matters.
 - 👀 **Document views** — toggle between rendered Markdown and source, or between a reflowed PDF reader and original PDF pages.
 - ✍️ **Editable preview** — switch the rendered preview into a Markdown-native rich editor with formatting controls.
@@ -39,6 +40,8 @@
 - 🔒 **Fully local documents** — parsing, rendering, persistence, and read-aloud generation happen in the browser; document content is never uploaded.
 
 Markdown is rendered with [react-markdown](https://github.com/remarkjs/react-markdown) using [remark-gfm](https://github.com/remarkjs/remark-gfm) for GitHub-flavored markdown (tables, task lists, strikethrough) and [rehype-sanitize](https://github.com/rehypejs/rehype-sanitize) plus custom URL/image sanitization. HTTP(S) images referenced by a document are fetched directly by the browser, while unsafe URL schemes remain blocked.
+
+Mermaid diagrams render in the browser with [Mermaid](https://mermaid.js.org), loaded only when a document contains one. Diagrams render at Mermaid's `strict` security level (label HTML sanitized, click callbacks disabled) and follow the light/dark theme. A `.mmd` or `.mermaid` file opens as a Markdown document holding one `mermaid` block and downloads as `.md`.
 
 PDFs are parsed and rendered in the browser with [PDF.js](https://mozilla.github.io/pdf.js/). Text-based PDFs are converted into a reflowable, read-aloud-friendly view while the original pages remain available in a separate view. Scanned PDFs without an embedded text layer require OCR and are reported as unsupported. Password-protected PDFs are not currently supported.
 
@@ -56,6 +59,7 @@ The optional natural read-aloud voice runs on-device after downloading its model
 | Styling    | [Tailwind CSS 4](https://tailwindcss.com)                                      |
 | Components | [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com)           |
 | Markdown   | [react-markdown](https://github.com/remarkjs/react-markdown) · remark · rehype |
+| Diagrams   | [Mermaid](https://mermaid.js.org)                                              |
 | PDF        | [PDF.js](https://mozilla.github.io/pdf.js/)                                    |
 | Icons      | [lucide-react](https://lucide.dev)                                             |
 | Theming    | [next-themes](https://github.com/pacocoursey/next-themes)                      |
@@ -92,6 +96,7 @@ components/
     read-aloud-toolbar.tsx    # Text-to-speech controls
     paste-dialog.tsx          # Paste-markdown dialog
     markdown-preview.tsx      # Rendered markdown output
+    mermaid-diagram.tsx       # Lazy Mermaid rendering for mermaid code blocks
     pdf-original-view.tsx     # Original PDF page rendering
     outline.tsx               # Heading outline
     file-summary.tsx          # File info + stats
@@ -103,6 +108,7 @@ lib/
   markdown/                   # Framework-free logic
     parse.ts                  # Markdown → block model (remark)
     ast.ts                    # AST helpers + heading slugger
+    mermaid.ts                # Mermaid file detection, wrapping, theme config
     speech, stats, sanitize, document, types
   pdf/                        # PDF.js loading, text extraction, and conversion
 public/assets/                # Brand logo variants (light/dark)

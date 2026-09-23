@@ -348,6 +348,78 @@
     padding: 1rem;
   }
 
+  .markdown-preview .mermaid-caption {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    padding-block: 0.25rem;
+  }
+
+  .markdown-preview .mermaid-toggle {
+    color: var(--muted-foreground);
+    font-family: var(--font-sans);
+  }
+
+  .markdown-preview .mermaid-diagram {
+    background: var(--card);
+    overflow-x: auto;
+    padding: 1.5rem 1rem;
+  }
+
+  .markdown-preview .mermaid-diagram svg {
+    display: block;
+    height: auto;
+    margin-inline: auto;
+    max-width: 100%;
+  }
+
+  /* Labels are HTML inside the SVG; keep the prose paragraph color off them so
+     a diagram's own classDef colors win. */
+  .markdown-preview .mermaid-diagram p {
+    color: inherit;
+  }
+
+  .markdown-preview .mermaid-diagram[data-state="pending"] {
+    align-items: center;
+    color: var(--muted-foreground);
+    display: flex;
+    font-size: 0.875rem;
+    justify-content: center;
+    min-height: 8rem;
+  }
+
+  .markdown-preview .mermaid-error {
+    border-bottom: 1px solid var(--border);
+    color: var(--destructive);
+    display: flex;
+    gap: 0.625rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .markdown-preview .mermaid-error > svg {
+    flex-shrink: 0;
+    margin-top: 0.2rem;
+    height: 1rem;
+    width: 1rem;
+  }
+
+  .markdown-preview .mermaid-error-title {
+    color: var(--destructive);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .markdown-preview .mermaid-error-message {
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.5;
+    margin-top: 0.25rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
   .markdown-preview img {
     border-radius: 0.5rem;
     display: block;

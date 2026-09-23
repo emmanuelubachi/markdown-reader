@@ -8,6 +8,7 @@ import {
   getPastedDocumentName,
   getReaderTabLabel,
   isMarkdownFile,
+  isMermaidFile,
   isPdfFile,
   isSupportedDocumentFile,
   normalizeDocumentName,
@@ -172,6 +173,21 @@ describe("isMarkdownFile", () => {
   });
 });
 
+describe("isMermaidFile", () => {
+  it("accepts Mermaid extensions regardless of case and opens them", () => {
+    expect(isMermaidFile(new File(["graph TD"], "flow.mmd"))).toBe(true);
+    expect(isMermaidFile(new File(["graph TD"], "FLOW.MERMAID"))).toBe(true);
+    expect(isSupportedDocumentFile(new File(["graph TD"], "flow.mmd"))).toBe(
+      true,
+    );
+  });
+
+  it("rejects files that only mention mermaid", () => {
+    expect(isMermaidFile(new File([""], "mermaid.md"))).toBe(false);
+    expect(isMermaidFile(new File([""], "flow.mmd.txt"))).toBe(false);
+  });
+});
+
 describe("PDF document detection", () => {
   it("accepts PDF extensions and MIME types", () => {
     expect(isPdfFile(new File([""], "REPORT.PDF"))).toBe(true);
@@ -256,6 +272,11 @@ describe("getDownloadFileName", () => {
     expect(getDownloadFileName("report.pdf")).toBe("report.md");
   });
 
+  it("downloads Mermaid documents as the Markdown they hold", () => {
+    expect(getDownloadFileName("flow.mmd")).toBe("flow.md");
+    expect(getDownloadFileName("Flow.MERMAID")).toBe("Flow.md");
+  });
+
   it("strips unsafe characters and falls back to a default name", () => {
     expect(getDownloadFileName('a/b\\c:d*e?f"g<h>i|j')).toBe("abcdefghij.md");
     expect(getDownloadFileName("///")).toBe("document.md");
@@ -277,6 +298,10 @@ describe("normalizeMarkdownDocumentName", () => {
     );
     expect(normalizeMarkdownDocumentName("Notes.mdown")).toBe("Notes.mdown");
     expect(normalizeMarkdownDocumentName("Draft.mkd")).toBe("Draft.mkd");
+    expect(normalizeMarkdownDocumentName("Flow.mmd")).toBe("Flow.mmd");
+    expect(normalizeMarkdownDocumentName("Flow.mermaid")).toBe(
+      "Flow.mermaid",
+    );
   });
 
   it("removes unsafe filename characters and rejects empty names", () => {

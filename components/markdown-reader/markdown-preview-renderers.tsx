@@ -15,7 +15,9 @@ import {
   type Options as RehypeSanitizeOptions,
 } from "rehype-sanitize";
 
+import { MermaidDiagram } from "@/components/markdown-reader/mermaid-diagram";
 import type { MarkdownAstNode } from "@/lib/markdown/ast";
+import { isMermaidCodeLanguage } from "@/lib/markdown/mermaid";
 import { sanitizeHref, sanitizeImageSrc } from "@/lib/markdown/sanitize";
 
 type MarkdownElementProps<Tag extends keyof JSX.IntrinsicElements> =
@@ -308,6 +310,10 @@ function MarkdownPre({
 
   const language = getCodeBlockLanguage(children);
 
+  if (isMermaidCodeLanguage(language)) {
+    return <MermaidDiagram code={getCodeBlockText(children)} />;
+  }
+
   return (
     <figure>
       {language ? <figcaption>{language}</figcaption> : null}
@@ -330,18 +336,40 @@ function MarkdownTable({
   );
 }
 
-function getCodeBlockLanguage(children: ReactNode) {
+function getCodeElement(children: ReactNode) {
   const codeElement = Children.toArray(children).find((child) =>
     isValidElement<MarkdownElementProps<"code">>(child),
   );
 
-  if (!isValidElement<MarkdownElementProps<"code">>(codeElement)) {
-    return null;
-  }
+  return isValidElement<MarkdownElementProps<"code">>(codeElement)
+    ? codeElement
+    : null;
+}
 
-  const match = codeElement.props.className?.match(/language-(\S+)/);
+function getCodeBlockLanguage(children: ReactNode) {
+  const match = getCodeElement(children)?.props.className?.match(
+    /language-(\S+)/,
+  );
 
   return match?.[1] ?? null;
+}
+
+function getCodeBlockText(children: ReactNode) {
+  return textOf(getCodeElement(children)?.props.children);
+}
+
+function textOf(children: ReactNode): string {
+  return Children.toArray(children)
+    .map((child) => {
+      if (typeof child === "string" || typeof child === "number") {
+        return String(child);
+      }
+
+      return isValidElement<{ children?: ReactNode }>(child)
+        ? textOf(child.props.children)
+        : "";
+    })
+    .join("");
 }
 
 function containsImageChild(children: ReactNode): boolean {

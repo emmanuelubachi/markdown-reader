@@ -102,6 +102,7 @@ export default function InitializedMarkdownEditor({
             javascript: "JavaScript",
             json: "JSON",
             markdown: "Markdown",
+            mermaid: "Mermaid",
             text: "Plain text",
             tsx: "TypeScript React",
             typescript: "TypeScript",
