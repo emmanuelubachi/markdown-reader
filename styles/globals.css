@@ -372,6 +372,7 @@
     height: auto;
     margin-inline: auto;
     max-width: 100%;
+    min-width: var(--diagram-min-width, 0);
   }
 
   /* Labels are HTML inside the SVG; keep the prose paragraph color off them so

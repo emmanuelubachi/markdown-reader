@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type CSSProperties } from "react";
 import { CodeXml, TriangleAlert, Workflow } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
-import { getMermaidConfig, type MermaidTheme } from "@/lib/markdown/mermaid";
+import {
+  getDiagramMinWidth,
+  getMermaidConfig,
+  type MermaidTheme,
+} from "@/lib/markdown/mermaid";
 
 type Mermaid = (typeof import("mermaid"))["default"];
 
@@ -85,6 +89,7 @@ export function MermaidDiagram({ code }: { code: string }) {
   // While a theme switch or edit re-renders, keep the previous diagram on
   // screen instead of collapsing to a placeholder.
   const svg = lastRender?.status === "ready" ? lastRender.svg : null;
+  const minWidth = svg ? getDiagramMinWidth(svg) : null;
   const isCodeVisible = showCode || error !== null;
 
   return (
@@ -132,6 +137,11 @@ export function MermaidDiagram({ code }: { code: string }) {
           // Mermaid renders with securityLevel "strict": label HTML is
           // sanitized and interactive callbacks are disabled.
           dangerouslySetInnerHTML={{ __html: svg }}
+          style={
+            minWidth
+              ? ({ "--diagram-min-width": `${minWidth}px` } as CSSProperties)
+              : undefined
+          }
         />
       ) : (
         <div className="mermaid-diagram" data-state="pending">

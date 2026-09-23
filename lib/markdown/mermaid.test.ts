@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getDiagramMinWidth,
   getMermaidConfig,
   hasMermaidExtension,
   isMermaidCodeLanguage,
@@ -74,5 +75,19 @@ describe("getMermaidConfig", () => {
     expect(dark.darkMode).toBe(true);
     expect(light.primaryColor).not.toBe(dark.primaryColor);
     expect(light.textColor).not.toBe(dark.textColor);
+  });
+});
+
+describe("getDiagramMinWidth", () => {
+  it("keeps a wide diagram at 80% of its natural width", () => {
+    expect(
+      getDiagramMinWidth('<svg viewBox="4 4 1495.2 326.9" width="100%">'),
+    ).toBe(1196);
+    expect(getDiagramMinWidth('<svg viewBox="-8 -8 400 200">')).toBe(320);
+  });
+
+  it("returns null when the SVG has no usable viewBox", () => {
+    expect(getDiagramMinWidth("<svg>")).toBeNull();
+    expect(getDiagramMinWidth('<svg viewBox="0 0 0 10">')).toBeNull();
   });
 });
